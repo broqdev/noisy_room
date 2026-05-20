@@ -1,0 +1,4 @@
+interface:
+  display_name: "Noisy RT"
+  short_description: "Dispatch noisy RT arguments"
+  default_prompt: "Use $noisy-rt --t1 to run the T1 noisy RT workflow section."
