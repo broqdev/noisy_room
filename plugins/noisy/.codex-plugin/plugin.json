@@ -1,0 +1,31 @@
+{
+  "name": "noisy",
+  "version": "0.0.0",
+  "description": "Project-local Noisy Room task-document workflows.",
+  "author": {
+    "name": "xsapphire"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "noisy-room",
+    "task-docs",
+    "markdown"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Noisy",
+    "shortDescription": "Project-local Noisy Room workflows.",
+    "longDescription": "Noisy provides project-local workflows for managing task markdown documents in Noisy Room.",
+    "developerName": "xsapphire",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "$noisy:taskmd create a task doc use 1.md as reference"
+    ],
+    "screenshots": []
+  }
+}

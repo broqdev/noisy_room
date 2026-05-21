@@ -1,4 +1,0 @@
-interface:
-  display_name: "Task MD"
-  short_description: "Track task goals and progress in markdown"
-  default_prompt: "Use $task-md --new to start a task markdown document."
