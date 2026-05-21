@@ -23,6 +23,8 @@ TESTS_DIR = REPO_ROOT / "tests"
 DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd"
+TASKMD_RT_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd-rt"
+TASKMD_RT_RUNNER = TASKMD_RT_SKILL_DIR / "scripts" / "run_roundtable.sh"
 GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "taskmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
@@ -357,6 +359,8 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
             "platform": platform.platform(),
             "repo_root": str(REPO_ROOT),
             "run_dir": str(self.run_dir),
+            "taskmd_rt_runner": str(TASKMD_RT_RUNNER),
+            "taskmd_rt_skill_dir": str(TASKMD_RT_SKILL_DIR),
             "workspace": str(self.workspace),
             "taskmd_skill_dir": str(TASKMD_SKILL_DIR),
             "runs_dir_env": os.environ.get("NOISY_TEST_RUNS_DIR"),
@@ -403,6 +407,8 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
         skill_root.mkdir(parents=True, exist_ok=True)
         skill_link = skill_root / "noisy:taskmd"
         skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
+        rt_skill_link = skill_root / "noisy:taskmd_rt"
+        rt_skill_link.symlink_to(TASKMD_RT_SKILL_DIR, target_is_directory=True)
 
     def _wire_gemini_skill(self) -> None:
         skill_root = self.workspace / ".gemini" / "skills"
@@ -463,6 +469,10 @@ def _safe_label(label: str) -> str:
 def create_test_run(name: str) -> TestRun:
     if not TASKMD_SKILL_DIR.exists():
         raise AssertionError(f"Taskmd skill directory does not exist: {TASKMD_SKILL_DIR}")
+    if not TASKMD_RT_SKILL_DIR.exists():
+        raise AssertionError(f"Taskmd RT skill directory does not exist: {TASKMD_RT_SKILL_DIR}")
+    if not TASKMD_RT_RUNNER.exists():
+        raise AssertionError(f"Taskmd RT runner does not exist: {TASKMD_RT_RUNNER}")
     if not GEMINI_TASKMD_COMMAND.exists():
         raise AssertionError(f"Gemini taskmd command does not exist: {GEMINI_TASKMD_COMMAND}")
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
@@ -524,14 +534,14 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
         "Creation Worklog metadata should only include trigger='revisit'"
     )
     for record in worklog_metadata:
-        assert record.get("agent_cli") == "codex-cli", f"Unexpected Worklog agent_cli: {record}"
+        assert record.get("agent") == "codex-cli", f"Unexpected Worklog agent: {record}"
         assert record.get("session_id"), f"Worklog metadata should include session_id: {record}"
         assert record.get("worklog_id"), f"Worklog metadata should include worklog_id: {record}"
 
     todo_metadata = metadata_by_section["TODO"]
     assert todo_metadata, "Creation should add at least one TODO record"
     for record in todo_metadata:
-        assert record.get("agent_cli") == "codex-cli", f"Unexpected TODO agent_cli: {record}"
+        assert record.get("agent") == "codex-cli", f"Unexpected TODO agent: {record}"
         assert record.get("session_id"), f"TODO metadata should include session_id: {record}"
 
 
@@ -614,6 +624,19 @@ def assert_skill_symlink_wired(workspace: Path) -> None:
     assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
         f"Expected noisy:taskmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
     )
+
+
+def assert_taskmd_rt_skill_wired(workspace: Path) -> None:
+    skill_link = workspace / ".codex" / "skills" / "noisy:taskmd_rt"
+    assert skill_link.is_symlink(), f"Expected noisy:taskmd_rt to be a symlink: {skill_link}"
+    assert skill_link.resolve() == TASKMD_RT_SKILL_DIR.resolve(), (
+        f"Expected noisy:taskmd_rt to point at live skill {TASKMD_RT_SKILL_DIR}, got {skill_link.resolve()}"
+    )
+
+
+def assert_taskmd_rt_discovered(result: CommandResult) -> None:
+    result.assert_success()
+    assert "noisy:taskmd_rt" in result.stdout, "Codex prompt input did not include noisy:taskmd_rt"
 
 
 def assert_gemini_taskmd_wired(workspace: Path) -> None:

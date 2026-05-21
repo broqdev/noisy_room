@@ -1,0 +1,4 @@
+interface:
+  display_name: "Noisy Room: Taskmd Roundtable"
+  short_description: "Alternate task work across Codex and Gemini"
+  default_prompt: "Use $noisy:taskmd_rt --r 1 with .noisy_room/tasks/example.md to alternate Codex and Gemini on the task."

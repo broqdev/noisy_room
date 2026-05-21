@@ -100,3 +100,37 @@ Use the Gemini command with the same taskmd arguments:
 ```text
 /noisy:taskmd --new create a task doc using 1.md as reference
 ```
+
+## Taskmd Roundtable Skill
+
+The roundtable skill lives at:
+
+```text
+plugins/noisy/skills/taskmd-rt/SKILL.md
+```
+
+It is exposed to Codex as:
+
+```text
+noisy:taskmd_rt
+```
+
+Use it to alternate an existing task doc between Codex CLI and Gemini CLI:
+
+```text
+$noisy:taskmd_rt --r 1 .noisy_room/tasks/example.md continue from the active TODO
+```
+
+One `--r` round means two interleaved `noisy:taskmd` calls after a task doc
+exists. If no task doc exists, `noisy:taskmd_rt` bootstraps by delegating to
+`noisy:taskmd`; that creation step does not consume a round.
+
+After each CLI call, the roundtable runner verifies that the task doc gained a
+new Worklog record from the CLI that just ran. A successful command exit is not
+enough.
+
+For this repo, keep:
+
+```text
+.codex/skills/noisy:taskmd_rt -> ../../plugins/noisy/skills/taskmd-rt
+```

@@ -40,6 +40,10 @@ NOISY_KEEP_TEST_ENVS=1 uv run pytest
 ## Current Coverage
 
 - Discovery smoke test: verifies Codex sees `noisy:taskmd` through the fake workspace symlink.
+- Roundtable discovery smoke test: verifies Codex sees `noisy:taskmd_rt` through the fake workspace symlink.
+- Roundtable runtime shape test: verifies the skill runner is Bash-only, not Python.
+- Roundtable dry-run scenarios: verify `noisy:taskmd_rt` routes from latest Worklog `agent` to the opposite CLI and treats bootstrap creation as outside the round count.
+- Roundtable Worklog advance tests: verify real runner calls fail when a CLI exits without appending Worklog metadata and pass when each CLI appends its own Worklog record.
 - Gemini wiring test: verifies the fake workspace sees `taskmd` as the Agent Skill and `/noisy:taskmd` as the custom command wrapper.
 - Gemini discovery smoke test: verifies `gemini skills list --all` sees `taskmd` without making a model call.
 - New task doc scenario: invokes `$noisy:taskmd --new` with `source.md`, validates the required markdown contract, then asks a Codex verifier for a structured semantic pass/fail result.

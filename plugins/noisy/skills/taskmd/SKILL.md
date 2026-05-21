@@ -72,7 +72,7 @@ Every task doc must use exactly this top-level structure and order. Normalize ol
 ### <YYYY-MM-DD HH:mm:ss UTC> - <Short summary>
 
 ```jsonl
-{ "agent_cli": "codex-cli", "session_id": "<session-id>", "worklog_id": "<generated-unique-id>", "trigger": "<todo|revisit>" }
+{ "agent": "codex-cli", "session_id": "<session-id>", "worklog_id": "<generated-unique-id>", "trigger": "<todo|revisit>" }
 ```
 
 <Session delta: actions taken, findings, decisions, files touched, blockers, and follow-up.>
@@ -82,7 +82,7 @@ Every task doc must use exactly this top-level structure and order. Normalize ol
 ### <YYYY-MM-DD HH:mm:ss UTC> - <Short archived summary>
 
 ```jsonl
-{ "type": "todo|knowledge", "agent_cli": "codex-cli", "session_id": "<session-id>" }
+{ "type": "todo|knowledge", "agent": "codex-cli", "session_id": "<session-id>" }
 ```
 
 <Archived content, why it moved here, and what replaced it if anything.>
@@ -92,7 +92,7 @@ Every task doc must use exactly this top-level structure and order. Normalize ol
 ### <YYYY-MM-DD HH:mm:ss UTC> - <Short action summary>
 
 ```jsonl
-{ "agent_cli": "codex-cli", "session_id": "<session-id>" }
+{ "agent": "codex-cli", "session_id": "<session-id>" }
 ```
 
 <Concrete next action and observable completion condition.>
