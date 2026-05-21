@@ -33,22 +33,24 @@ The task doc is ready for a one-round real handoff.
 ### 2026-05-20 00:00:00 UTC - Seeded task doc
 
 ```jsonl
-{ "agent": "codex-cli", "session_id": "seed", "worklog_id": "seed-work", "trigger": "todo" }
+{ "agent": "codex-cli", "session_id": "seed", "worklog_id": "seed-work", "trigger": "roadmap" }
 ```
 
 Seeded the task doc so the next roundtable turn should go to Gemini.
 
 ## Archived
 
-## TODO
+## Roadmap
 
-### 2026-05-20 00:00:00 UTC - Continue real roundtable
+### R001 - Continue real roundtable
 
 ```jsonl
-{ "agent": "codex-cli", "session_id": "seed" }
+{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "agent": "codex-cli", "session_id": "seed" }
 ```
 
-Append real Gemini and Codex roundtable Worklog entries without changing other files.
+Rationale: The seeded doc exists only to verify the real roundtable handoff behavior.
+
+Task: Append real Gemini and Codex roundtable Worklog entries without changing other files.
 """
 
 

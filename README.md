@@ -118,7 +118,7 @@ noisy:taskmd-rt
 Use it to alternate an existing task doc between Codex CLI and Gemini CLI:
 
 ```text
-$noisy:taskmd-rt -r 1 .noisy_room/tasks/example.md continue from the active TODO
+$noisy:taskmd-rt -r 1 .noisy_room/tasks/example.md continue from the active Roadmap
 ```
 
 One `-r` round means two delegated `noisy:taskmd` CLI turns after a task doc

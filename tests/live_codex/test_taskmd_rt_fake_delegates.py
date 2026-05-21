@@ -31,22 +31,24 @@ The task doc is ready for a one-round handoff.
 ### 2026-05-20 00:00:00 UTC - Seeded task doc
 
 ```jsonl
-{ "agent": "codex-cli", "session_id": "seed", "worklog_id": "seed-work", "trigger": "todo" }
+{ "agent": "codex-cli", "session_id": "seed", "worklog_id": "seed-work", "trigger": "roadmap" }
 ```
 
 Seeded the task doc so the next roundtable turn should go to Gemini.
 
 ## Archived
 
-## TODO
+## Roadmap
 
-### 2026-05-20 00:00:00 UTC - Continue roundtable
+### R001 - Continue roundtable
 
 ```jsonl
-{ "agent": "codex-cli", "session_id": "seed" }
+{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "agent": "codex-cli", "session_id": "seed" }
 ```
 
-Continue the taskmd-rt fake-delegate handoff.
+Rationale: The seeded doc exists only to verify roundtable handoff behavior.
+
+Task: Continue the taskmd-rt fake-delegate handoff.
 """
 
 
@@ -86,7 +88,7 @@ cat > "$entry_file" <<'ENTRY'
 ### 2026-05-20 00:00:00 UTC - Fake {agent} roundtable turn
 
 ```jsonl
-{{ "agent": "{agent}", "session_id": "fake", "worklog_id": "{worklog_id}", "trigger": "todo" }}
+{{ "agent": "{agent}", "session_id": "fake", "worklog_id": "{worklog_id}", "trigger": "roadmap" }}
 ```
 
 Fake {agent} appended this Worklog entry for taskmd-rt fake-delegate coverage.

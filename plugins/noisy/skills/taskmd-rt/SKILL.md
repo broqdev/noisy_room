@@ -103,7 +103,7 @@ codex exec --skip-git-repo-check --ephemeral --dangerously-bypass-approvals-and-
 
 Roundtable turn <turn>/<total-turns>.
 Append a new Worklog entry before exiting.
-In Worklog/TODO/Archived metadata, write "agent": "codex-cli".'
+In Worklog/Roadmap/Archived metadata, write "agent": "codex-cli".'
 ```
 
 Run delegated Codex in the Codex CLI equivalent of Gemini YOLO mode: `--dangerously-bypass-approvals-and-sandbox`. Do not let it inherit a read-only sandbox from the caller or user config; a Codex roundtable turn must be able to update the workspace task doc and any task outputs under the workspace root.
@@ -115,7 +115,7 @@ cd "$workspace_root" && GEMINI_CLI_TRUST_WORKSPACE=true gemini --skip-trust --ap
 
 Roundtable turn <turn>/<total-turns>.
 Append a new Worklog entry before exiting.
-In Worklog/TODO/Archived metadata, write "agent": "gemini-cli".'
+In Worklog/Roadmap/Archived metadata, write "agent": "gemini-cli".'
 ```
 
 If the task doc says `/Users/xsapphire/pj_ml/pj_mgba_mem` is a reference repo and the workspace root is `/Users/xsapphire/pj_ml/pj_mgba_mem_2`, set:
@@ -151,13 +151,13 @@ A failed delegated turn is a turn outcome, not a roundtable stop condition. Log 
 Initial roundtable routing depends only on the latest Worklog metadata:
 
 ```json
-{ "agent": "codex-cli", "trigger": "todo" }
+{ "agent": "codex-cli", "trigger": "roadmap" }
 ```
 
-Do not route from prose, TODO metadata, or Archived metadata.
+Do not route from prose, Roadmap metadata, or Archived metadata.
 After the first delegated turn in a run, route by alternating from the previously attempted CLI so a failed turn cannot cause the same CLI to be selected again.
 
-Each delegated call must append a new Worklog entry. Editing the previous Worklog or only changing TODO is a failed roundtable turn.
+Each delegated call must append a new Worklog entry. Editing the previous Worklog or only changing Roadmap is a failed roundtable turn.
 
 ## Reporting
 

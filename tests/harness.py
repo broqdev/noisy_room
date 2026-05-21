@@ -27,10 +27,13 @@ TASKMD_RT_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd-rt"
 GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "taskmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
-TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Progress", "Worklog", "Archived", "TODO"]
+TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Progress", "Worklog", "Archived", "Roadmap"]
 DATED_ENTRY = re.compile(r"^### \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC - .+")
-TODO_RATIONALE = "Rationale:"
-TODO_TASK = "Task:"
+ROADMAP_ENTRY = re.compile(r"^### (R\d{3}) - .+")
+UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$")
+ROADMAP_ID = re.compile(r"^R\d{3}$")
+ROADMAP_RATIONALE = "Rationale:"
+ROADMAP_TASK = "Task:"
 
 
 @dataclass(frozen=True)
@@ -316,8 +319,8 @@ Return JSON matching the provided schema. Set passed=true only when all are true
 - Knowledge captures stable constraints or references from the source brief.
 - Knowledge treats the source brief as reference-only and does not expand scope to editing it.
 - Progress says the task doc was created and implementation has not started, or an equivalent current-state statement.
-- TODO contains a concrete next action that would advance the source brief's work.
-- TODO does not tell the next agent to edit the source brief unless the source brief explicitly requested that.
+- Roadmap contains at least one concrete next action that would advance the source brief's work.
+- Roadmap does not tell the next agent to edit the source brief unless the source brief explicitly requested that.
 
 If any check fails, set passed=false and list concise issues. Do not edit files.
 """.strip()
@@ -520,7 +523,7 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
     )
     section_text = _section_text(lines)
     knowledge = section_text["Knowledge"].lower()
-    todo = section_text["TODO"].lower()
+    roadmap = section_text["Roadmap"].lower()
     assert source_name in section_text["Knowledge"], f"Knowledge should list {source_name!r}"
     assert "reference" in knowledge, "Knowledge should mark source docs as reference material"
     assert ("do not" in knowledge or "must not" in knowledge) and (
@@ -529,8 +532,8 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
         or "modification" in knowledge
         or "edit" in knowledge
     ), "Knowledge should say the source/reference docs must not be modified"
-    assert not re.search(rf"\b(edit|modify|update|change)\b[^\n]*\b{re.escape(source_name.lower())}\b", todo), (
-        f"TODO should not ask future work to edit {source_name!r}"
+    assert not re.search(rf"\b(edit|modify|update|change)\b[^\n]*\b{re.escape(source_name.lower())}\b", roadmap), (
+        f"Roadmap should not ask future work to edit {source_name!r}"
     )
 
     metadata_by_section = _collect_metadata(lines)
@@ -544,12 +547,12 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
         assert record.get("session_id"), f"Worklog metadata should include session_id: {record}"
         assert record.get("worklog_id"), f"Worklog metadata should include worklog_id: {record}"
 
-    todo_metadata = metadata_by_section["TODO"]
-    assert todo_metadata, "Creation should add at least one TODO record"
-    for record in todo_metadata:
-        assert record.get("agent") == "codex-cli", f"Unexpected TODO agent: {record}"
-        assert record.get("session_id"), f"TODO metadata should include session_id: {record}"
-    assert_todo_entries_have_rationale_and_task(lines)
+    roadmap_metadata = metadata_by_section["Roadmap"]
+    assert roadmap_metadata, "Creation should add at least one Roadmap record"
+    for record in roadmap_metadata:
+        assert record.get("agent") == "codex-cli", f"Unexpected Roadmap agent: {record}"
+        assert record.get("session_id"), f"Roadmap metadata should include session_id: {record}"
+    assert_roadmap_entries_have_required_shape(lines)
 
 
 def assert_new_task_doc_side_effects(
@@ -589,48 +592,66 @@ def _collect_metadata(lines: list[str]) -> dict[str, list[dict[str, object]]]:
         if line.startswith("## "):
             current_section = line[3:].strip()
             continue
-        if current_section not in {"Worklog", "TODO", "Archived"}:
+        if current_section not in {"Worklog", "Roadmap", "Archived"}:
             continue
-        if DATED_ENTRY.match(line):
+        if _is_entry_heading(line, current_section):
             metadata[current_section].append(_read_jsonl_metadata(lines, index, current_section))
     return metadata
 
 
-def assert_todo_entries_have_rationale_and_task(lines: list[str]) -> None:
-    bodies = _entry_bodies(lines, "TODO")
-    assert bodies, "TODO should contain at least one entry"
-    for body in bodies:
+def assert_roadmap_entries_have_required_shape(lines: list[str]) -> None:
+    entries = _entries(lines, "Roadmap")
+    assert entries, "Roadmap should contain at least one entry"
+    seen_ids: set[str] = set()
+    for heading, metadata, body in entries:
+        match = ROADMAP_ENTRY.match(heading)
+        assert match, f"Roadmap entry heading should start with an R### ID: {heading}"
+        roadmap_id = match.group(1)
+        assert roadmap_id not in seen_ids, f"Roadmap id should be unique: {roadmap_id}"
+        seen_ids.add(roadmap_id)
+        assert metadata.get("id") == roadmap_id, (
+            f"Roadmap metadata id should match heading id {roadmap_id}: {metadata}"
+        )
+        created_at = metadata.get("created_at")
+        assert isinstance(created_at, str) and UTC_TIMESTAMP.match(created_at), (
+            f"Roadmap metadata created_at should be a UTC timestamp: {metadata}"
+        )
+        assert "updated_at" not in metadata, f"Roadmap metadata should not include updated_at: {metadata}"
+        deps = metadata.get("deps")
+        assert isinstance(deps, list) and all(
+            isinstance(dep, str) and ROADMAP_ID.match(dep) for dep in deps
+        ), f"Roadmap metadata deps should be an array of R### ids: {metadata}"
         body_lines = body.splitlines()
         rationale_lines = [
-            index for index, line in enumerate(body_lines) if line.startswith(TODO_RATIONALE)
+            index for index, line in enumerate(body_lines) if line.startswith(ROADMAP_RATIONALE)
         ]
         task_lines = [
-            index for index, line in enumerate(body_lines) if line.startswith(TODO_TASK)
+            index for index, line in enumerate(body_lines) if line.startswith(ROADMAP_TASK)
         ]
         assert len(rationale_lines) == 1, (
-            "TODO entry body should include exactly one 'Rationale:' line"
+            "Roadmap entry body should include exactly one 'Rationale:' line"
         )
-        assert len(task_lines) == 1, "TODO entry body should include exactly one 'Task:' line"
+        assert len(task_lines) == 1, "Roadmap entry body should include exactly one 'Task:' line"
         rationale_index = rationale_lines[0]
         task_index = task_lines[0]
-        assert rationale_index < task_index, "TODO entry body should put 'Rationale:' before 'Task:'"
+        assert rationale_index < task_index, "Roadmap entry body should put 'Rationale:' before 'Task:'"
         preface = "\n".join(body_lines[:rationale_index]).strip()
-        assert not preface, "TODO entry body should start with 'Rationale:'"
+        assert not preface, "Roadmap entry body should start with 'Rationale:'"
         rationale = "\n".join(
             [
-                body_lines[rationale_index][len(TODO_RATIONALE):],
+                body_lines[rationale_index][len(ROADMAP_RATIONALE):],
                 *body_lines[rationale_index + 1:task_index],
             ]
         ).strip()
         task = "\n".join(
-            [body_lines[task_index][len(TODO_TASK):], *body_lines[task_index + 1:]]
+            [body_lines[task_index][len(ROADMAP_TASK):], *body_lines[task_index + 1:]]
         ).strip()
-        assert rationale, "TODO entry Rationale should be non-empty"
-        assert task, "TODO entry Task should be non-empty"
+        assert rationale, "Roadmap entry Rationale should be non-empty"
+        assert task, "Roadmap entry Task should be non-empty"
 
 
-def _entry_bodies(lines: list[str], section: str) -> list[str]:
-    bodies: list[str] = []
+def _entries(lines: list[str], section: str) -> list[tuple[str, dict[str, object], str]]:
+    entries: list[tuple[str, dict[str, object], str]] = []
     current_section: str | None = None
     index = 0
     while index < len(lines):
@@ -639,13 +660,15 @@ def _entry_bodies(lines: list[str], section: str) -> list[str]:
             current_section = line[3:].strip()
             index += 1
             continue
-        if current_section != section or not DATED_ENTRY.match(line):
+        if current_section != section or not _is_entry_heading(line, section):
             index += 1
             continue
+        heading = line
 
         cursor = index + 1
         while cursor < len(lines) and not lines[cursor].strip():
             cursor += 1
+        metadata = _read_jsonl_metadata(lines, index, section)
         if cursor < len(lines) and lines[cursor].strip() == "```jsonl":
             cursor += 3
         while cursor < len(lines) and not lines[cursor].strip():
@@ -653,13 +676,19 @@ def _entry_bodies(lines: list[str], section: str) -> list[str]:
 
         body_lines: list[str] = []
         while cursor < len(lines):
-            if lines[cursor].startswith("## ") or DATED_ENTRY.match(lines[cursor]):
+            if lines[cursor].startswith("## ") or _is_entry_heading(lines[cursor], section):
                 break
             body_lines.append(lines[cursor])
             cursor += 1
-        bodies.append("\n".join(body_lines).strip())
+        entries.append((heading, metadata, "\n".join(body_lines).strip()))
         index = cursor
-    return bodies
+    return entries
+
+
+def _is_entry_heading(line: str, section: str) -> bool:
+    if section == "Roadmap":
+        return bool(ROADMAP_ENTRY.match(line))
+    return bool(DATED_ENTRY.match(line))
 
 
 def _read_jsonl_metadata(lines: list[str], heading_index: int, section: str) -> dict[str, object]:

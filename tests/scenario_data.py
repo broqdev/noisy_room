@@ -30,20 +30,22 @@ The CSV command has already been implemented.
 ### 2026-05-20 00:00:00 UTC - Implemented command
 
 ```jsonl
-{ "agent": "codex-cli", "session_id": "bad", "worklog_id": "bad-work", "trigger": "todo" }
+{ "agent": "codex-cli", "session_id": "bad", "worklog_id": "bad-work", "trigger": "roadmap" }
 ```
 
 Implemented the CSV command instead of only creating a task doc.
 
 ## Archived
 
-## TODO
+## Roadmap
 
-### 2026-05-20 00:00:00 UTC - Edit source brief
+### R001 - Edit source brief
 
 ```jsonl
-{ "agent": "codex-cli", "session_id": "bad" }
+{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "agent": "codex-cli", "session_id": "bad" }
 ```
 
-Edit source.md to match the completed implementation.
+Rationale: The bad doc incorrectly treats the source brief as something to rewrite.
+
+Task: Edit source.md to match the completed implementation.
 """
