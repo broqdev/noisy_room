@@ -26,7 +26,7 @@ Parse options and action flags first:
 - `--revisit`: refresh an existing task doc without executing task work.
 - `--revisit-threshold <N>`: override the default auto-revisit threshold for this invocation. Use a non-negative integer; `0` means always revisit before an inferred continue.
 
-Default auto-revisit threshold: 5 Worklog records after the latest `trigger: "revisit"` Worklog record.
+Default auto-revisit threshold: 3 Worklog records after the latest `trigger: "revisit"` Worklog record.
 
 If any unsupported `--flag` is present, report the supported flags and options. If multiple supported action flags remain, ask the user to choose one.
 

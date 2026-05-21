@@ -64,3 +64,39 @@ You can verify discovery with:
 ```sh
 codex debug prompt-input 'test skill discovery' | rg 'noisy:taskmd'
 ```
+
+## Gemini CLI Wiring
+
+Gemini CLI uses the `SKILL.md` frontmatter name for Agent Skill discovery, so this
+skill appears as:
+
+```text
+taskmd
+```
+
+The repo also provides a project command for the namespaced workflow:
+
+```text
+.gemini/commands/noisy/taskmd.toml -> /noisy:taskmd
+.gemini/skills/taskmd -> plugins/noisy/skills/taskmd
+```
+
+After changing Gemini wiring in an active session, reload both registries:
+
+```text
+/skills reload
+/commands reload
+```
+
+Then confirm `/skills list` shows `taskmd`. To check from a non-interactive
+shell, trust the workspace for that command:
+
+```sh
+GEMINI_CLI_TRUST_WORKSPACE=true gemini skills list --all
+```
+
+Use the Gemini command with the same taskmd arguments:
+
+```text
+/noisy:taskmd --new create a task doc using 1.md as reference
+```

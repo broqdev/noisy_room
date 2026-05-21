@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -22,6 +23,7 @@ TESTS_DIR = REPO_ROOT / "tests"
 DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd"
+GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "taskmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
 TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Progress", "Worklog", "Archived", "TODO"]
@@ -65,6 +67,33 @@ PERMISSIVE_PROFILE = CodexExecutionProfile(
         "--skip-git-repo-check",
         "--ephemeral",
         "--dangerously-bypass-approvals-and-sandbox",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class GeminiExecutionProfile:
+    name: str
+    flags: tuple[str, ...]
+    timeout_seconds: int = 600
+
+    def command(self, prompt: str) -> list[str]:
+        return [
+            "gemini",
+            "--prompt",
+            prompt,
+            "--output-format",
+            "text",
+            *self.flags,
+        ]
+
+
+GEMINI_YOLO_PROFILE = GeminiExecutionProfile(
+    name="gemini-yolo",
+    flags=(
+        "--skip-trust",
+        "--approval-mode",
+        "yolo",
     ),
 )
 
@@ -125,7 +154,7 @@ class TestRun:
     def workspace_file_hashes(self) -> dict[str, str]:
         hashes: dict[str, str] = {}
         for root, dirs, files in os.walk(self.workspace, followlinks=False):
-            dirs[:] = [directory for directory in dirs if directory != ".codex"]
+            dirs[:] = [directory for directory in dirs if directory not in {".codex", ".gemini"}]
             for filename in files:
                 path = Path(root) / filename
                 if path.is_symlink():
@@ -140,6 +169,7 @@ class TestRun:
         *,
         label: str,
         cwd: Path | None = None,
+        env: Mapping[str, str] | None = None,
         timeout_seconds: int = 120,
     ) -> CommandResult:
         command_tuple = tuple(command)
@@ -147,6 +177,7 @@ class TestRun:
             process = subprocess.Popen(
                 command,
                 cwd=cwd or self.workspace,
+                env={**os.environ, **env} if env is not None else None,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -233,6 +264,37 @@ class TestRun:
         assert result is not None
         return result
 
+    def gemini_exec(
+        self,
+        prompt: str,
+        *,
+        label: str,
+        profile: GeminiExecutionProfile = GEMINI_YOLO_PROFILE,
+    ) -> CommandResult:
+        command = profile.command(prompt)
+        before_status = self._repo_status()
+        captured_error: AssertionError | None = None
+        result: CommandResult | None = None
+        try:
+            result = self.run_command(
+                command,
+                label=label,
+                env={"GEMINI_CLI_TRUST_WORKSPACE": "true"},
+                timeout_seconds=profile.timeout_seconds,
+            )
+        except AssertionError as error:
+            captured_error = error
+
+        mutation_error = self._repo_mutation_error(label, before_status, self._repo_status())
+        if captured_error and mutation_error:
+            raise AssertionError(f"{captured_error}\n\n{mutation_error}") from captured_error
+        if mutation_error:
+            raise AssertionError(mutation_error)
+        if captured_error:
+            raise captured_error
+        assert result is not None
+        return result
+
     def verify_new_task_doc_semantics(self, *, source: Path, task_doc: Path) -> VerifierResult:
         output_path = self.artifacts / "verifier-result.json"
         prompt = f"""
@@ -264,7 +326,9 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
 
     def _write_run_metadata(self) -> None:
         codex_path = shutil.which("codex")
+        gemini_path = shutil.which("gemini")
         codex_version = ""
+        gemini_version = ""
         if codex_path:
             version_result = subprocess.run(
                 [codex_path, "--version"],
@@ -274,9 +338,21 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
                 check=False,
             )
             codex_version = (version_result.stdout or version_result.stderr).strip()
+        if gemini_path:
+            version_result = subprocess.run(
+                [gemini_path, "--version"],
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+            gemini_version = (version_result.stdout or version_result.stderr).strip()
         metadata = {
             "codex_path": codex_path,
             "codex_version": codex_version,
+            "gemini_path": gemini_path,
+            "gemini_taskmd_command": str(GEMINI_TASKMD_COMMAND),
+            "gemini_version": gemini_version,
             "python": sys.version,
             "platform": platform.platform(),
             "repo_root": str(REPO_ROOT),
@@ -319,10 +395,25 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
         )
 
     def _wire_skill(self) -> None:
+        self._wire_codex_skill()
+        self._wire_gemini_skill()
+
+    def _wire_codex_skill(self) -> None:
         skill_root = self.workspace / ".codex" / "skills"
         skill_root.mkdir(parents=True, exist_ok=True)
         skill_link = skill_root / "noisy:taskmd"
         skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
+
+    def _wire_gemini_skill(self) -> None:
+        skill_root = self.workspace / ".gemini" / "skills"
+        skill_root.mkdir(parents=True, exist_ok=True)
+        skill_link = skill_root / "taskmd"
+        skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
+
+        command_root = self.workspace / ".gemini" / "commands" / "noisy"
+        command_root.mkdir(parents=True, exist_ok=True)
+        command_link = command_root / "taskmd.toml"
+        command_link.symlink_to(GEMINI_TASKMD_COMMAND)
 
     def _write_command_artifacts(self, result: CommandResult) -> None:
         self._command_count += 1
@@ -372,6 +463,8 @@ def _safe_label(label: str) -> str:
 def create_test_run(name: str) -> TestRun:
     if not TASKMD_SKILL_DIR.exists():
         raise AssertionError(f"Taskmd skill directory does not exist: {TASKMD_SKILL_DIR}")
+    if not GEMINI_TASKMD_COMMAND.exists():
+        raise AssertionError(f"Gemini taskmd command does not exist: {GEMINI_TASKMD_COMMAND}")
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     return TestRun(name)
 
@@ -520,6 +613,30 @@ def assert_skill_symlink_wired(workspace: Path) -> None:
     assert skill_link.is_symlink(), f"Expected noisy:taskmd to be a symlink: {skill_link}"
     assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
         f"Expected noisy:taskmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
+    )
+
+
+def assert_gemini_taskmd_wired(workspace: Path) -> None:
+    skill_link = workspace / ".gemini" / "skills" / "taskmd"
+    assert skill_link.is_symlink(), f"Expected taskmd to be a symlink: {skill_link}"
+    assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
+        f"Expected taskmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
+    )
+
+    command_link = workspace / ".gemini" / "commands" / "noisy" / "taskmd.toml"
+    assert command_link.is_symlink(), f"Expected /noisy:taskmd command to be a symlink: {command_link}"
+    assert command_link.resolve() == GEMINI_TASKMD_COMMAND.resolve(), (
+        f"Expected Gemini command to point at {GEMINI_TASKMD_COMMAND}, got {command_link.resolve()}"
+    )
+
+
+def assert_gemini_taskmd_discovered(result: CommandResult) -> None:
+    result.assert_success()
+    assert re.search(r"^taskmd\s+\[Enabled\]", result.stdout, re.MULTILINE), (
+        "Gemini skills list did not include taskmd as an enabled skill"
+    )
+    assert not re.search(r"^noisy:taskmd\s+\[", result.stdout, re.MULTILINE), (
+        "Gemini should discover the skill as taskmd; noisy:taskmd is the custom command name"
     )
 
 
