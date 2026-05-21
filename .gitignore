@@ -3,6 +3,13 @@ dist/
 .DS_Store
 *.tsbuildinfo
 
+# Python test harness
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+tests/.runs/
+
 # local dev only
 .codex/
 CONTEXT.md

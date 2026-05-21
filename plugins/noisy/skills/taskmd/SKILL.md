@@ -44,9 +44,9 @@ When a prompt references files, such as `use 1.md as reference`, read those file
 
 ## Related Skill Use
 
-After resolving the action target, use another available skill only when the current prompt or selected active TODO names it, or when the current action clearly requires a specialized workflow matched by that skill's name/description. `Goal`, `Knowledge`, and `Progress` may inform the decision; treat `Worklog` and `Archived` as historical unless the active TODO refers to them.
+After resolving the action target, use another skill only when the prompt, active TODO, or action clearly calls for it. `Goal`, `Knowledge`, and `Progress` may inform the decision; treat `Worklog` and `Archived` as history unless the active TODO refers to them.
 
-Prefer the most specific match. Do not invent skills or load loosely related skills. For `New` and `Revisit`, related skills are consult-only: read relevant guidance for terminology, constraints, expected outputs, or questions, but do not run commands, edit non-task files, dispatch sub-workflows, or execute task work. For `Continue`, use related skills only after selecting the TODO and understanding `Goal`, `Knowledge`, and `Progress`.
+Prefer the most specific match. Do not invent skills or load loose matches. For `New` and `Revisit`, related skills are consult-only: read guidance, but do not run commands, edit non-task files, dispatch sub-workflows, or execute task work. For `Continue`, use related skills only after selecting the TODO and reading `Goal`, `Knowledge`, and `Progress`.
 
 ## Task Document Contract
 
@@ -77,16 +77,6 @@ Every task doc must use exactly this top-level structure and order. Normalize ol
 
 <Session delta: actions taken, findings, decisions, files touched, blockers, and follow-up.>
 
-## TODO
-
-### <YYYY-MM-DD HH:mm:ss UTC> - <Short action summary>
-
-```jsonl
-{ "agent_cli": "codex-cli", "session_id": "<session-id>" }
-```
-
-<Concrete next action and observable completion condition.>
-
 ## Archived
 
 ### <YYYY-MM-DD HH:mm:ss UTC> - <Short archived summary>
@@ -96,6 +86,16 @@ Every task doc must use exactly this top-level structure and order. Normalize ol
 ```
 
 <Archived content, why it moved here, and what replaced it if anything.>
+
+## TODO
+
+### <YYYY-MM-DD HH:mm:ss UTC> - <Short action summary>
+
+```jsonl
+{ "agent_cli": "codex-cli", "session_id": "<session-id>" }
+```
+
+<Concrete next action and observable completion condition.>
 ````
 
 Rules:
@@ -133,15 +133,15 @@ When updating an existing task doc after `Continue` or `Revisit / Refine`:
 Create a task doc only; do not execute task work.
 
 1. Require enough prompt/source material to name the task and infer a goal. Ask if missing.
-2. Read referenced source docs/files from the prompt.
+2. Read referenced files as reference-only inputs; do not modify them.
 3. Create `.noisy_room/tasks/` if needed.
 4. Choose a concise lowercase hyphenated slug and create a new `.md` file without overwriting an existing file.
 5. Fill the mandatory contract from the prompt and source docs:
    - `Goal`: summarize the requested outcome.
-   - `Knowledge`: capture stable facts, assumptions, constraints, decisions, and references from the prompt/source docs.
+   - `Knowledge`: capture stable facts, assumptions, constraints, decisions, and references. List any source files, and note they are reference-only and must not be modified unless the user expands scope.
    - `Progress`: state that the task doc was created and implementation has not started.
    - `Worklog`: add an initial creation record with `trigger: "revisit"`, mentioning referenced source docs when used.
-   - `TODO`: add the first concrete next action.
+   - `TODO`: add the first concrete next action. Do not include editing source files unless explicitly requested.
    - `Archived`: leave empty unless source material explicitly contains stale or superseded content.
 6. Report the created task doc path.
 
@@ -160,11 +160,26 @@ Work from an existing task doc, then update it.
 Refresh an existing task doc only; do not execute task work.
 
 1. Establish `Existing Task Doc Baseline`.
-2. Review Worklog records since the latest `trigger: "revisit"` record, or all Worklog records if none exists. Identify completed work, decisions made, tools used, active uncertainty, prior decisions that should not be accidentally reopened, and loophole patterns: repeated workarounds, shortcuts, scope drift, or revived archived work that bypasses the task's goal or constraints.
-3. When web access is available, web search for tools and knowledge that could help the recent work: actively maintained libraries, open-source projects, official docs, GitHub releases/issues, examples, articles, or known techniques. Prefer recently created or updated sources, and judge whether each source should change assumptions, approach, or next TODOs.
-4. Treat the baseline state as possibly stale. Compare it with the latest prompt, referenced files, files cited by the doc, minimal repo checks needed to validate specific stale or conflicting claims, useful external research, and any loophole patterns from Worklog/Archived. Avoid repo-wide discovery unless the user asks for it.
-5. Apply `Existing Task Doc Update Order` with `trigger: "revisit"` without executing task work. The Worklog must summarize the log range reviewed, research performed, useful sources or rejected leads, and doc-only decisions. Preserve still-valid content; rewrite stale or inaccurate `Knowledge`, `Progress`, and active `TODO`; and add missing current information.
-6. If loophole patterns were found, add explicit `Knowledge` guardrails that forbid or prevent the bypass, then align `Progress` and TODO so future work follows the intended path.
+2. Review Worklog records since the latest `trigger: "revisit"` record, or all records if none exists.
+   - Identify completed work, decisions, tools used, uncertainty, and decisions that should not be reopened.
+   - Audit Worklog history and active TODOs for Goal Drift.
+   - Goal Drift means work that no longer advances the `Goal`, widens scope without a user decision, or keeps following side paths.
+   - Also look for loopholes: repeated workarounds, shortcuts, scope drift, or revived archived work that bypasses the task's goal or constraints.
+3. Decide whether external research is useful before searching. Search only when the task has time-sensitive dependencies, recent Worklog/TODO entries mention things that may have changed, or the user asks for research. If research is unnecessary, record that decision in the Worklog and continue locally.
+   - When research runs, anchor searches to the session date; if unavailable, get the current date first.
+   - Use last revisit/worklog dates in queries, e.g. `as of <current-date>`, `updated since <last-revisit-date>`, `released <year>`, or `latest <tool/topic>`.
+   - Prefer sources with explicit created, updated, release, or issue dates: official docs, active GitHub repositories, releases, changelogs, issues, examples, and substantive articles.
+   - Do not accept recency by title alone; check source dates and decide whether the source changes assumptions, approach, or next TODOs.
+4. Treat the baseline as possibly stale. Compare it with the latest prompt, referenced files, cited files, targeted repo checks, useful research, and loophole patterns from Worklog/Archived. Avoid repo-wide discovery unless asked.
+5. Apply `Existing Task Doc Update Order` with `trigger: "revisit"` without executing task work.
+   - The Worklog must summarize the log range reviewed, whether external research was needed, and doc-only decisions.
+   - If research ran, include the date used plus useful sources or rejected leads with dates when available.
+   - If Goal Drift or loopholes were found, summarize them explicitly.
+   - Preserve valid content; rewrite stale or inaccurate `Knowledge`, `Progress`, and active `TODO`; add missing current information.
+6. If Goal Drift or loophole patterns were found, correct them narrowly.
+   - Add `Knowledge` guardrails that name the pattern and forbid repeating it.
+   - Archive drifted, bypassing, completed, dropped, or superseded TODOs.
+   - Rewrite active TODO to the smallest next action back toward the `Goal`.
 7. If external tools or knowledge are useful, update `Knowledge` and `TODO` so future task work can use them.
 8. Ask targeted questions only when conflicts cannot be resolved from the prompt, referenced files, repo, or research.
 9. Report the task doc path and summarize doc-only changes.

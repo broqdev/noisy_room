@@ -1,4 +1,4 @@
 interface:
-  display_name: "Noisy Task MD"
+  display_name: "Noisy Room: Task Markdown"
   short_description: "Track task goals and progress in markdown"
   default_prompt: "Use $noisy:taskmd --new to create a task doc from this prompt or a reference markdown file."
