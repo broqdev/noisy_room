@@ -41,10 +41,24 @@ def test_taskmd_documents_action_flag_aliases() -> None:
     assert "`-n`/`--new`" in skill
     assert "`-c`/`--continue`" in skill
     assert "`-rv`/`--revisit`" in skill
+    assert "`-r`/`--round <N>`" in skill
     assert "`--revisit-n <N>`" in skill
     assert "Treat `-rv` as one exact alias" in skill
     deprecated_threshold_flag = "--revisit-" + "threshold"
     assert deprecated_threshold_flag not in skill
+
+
+def test_taskmd_rounds_repeat_dispatch_level() -> None:
+    skill = (TASKMD_SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Dispatch rounds happen at this level" in skill
+    assert "manually invoking `$noisy:tmd ...` once" in skill
+    assert "reread the task doc" in skill
+    assert "rerun intent inference" in skill
+    assert "reapply the auto-revisit threshold" in skill
+    assert "Do not collapse multiple rounds into one larger `Continue` or `Revisit`" in skill
+    assert "Do not invoke `noisy:taskmd-rt` or alternate CLIs" in skill
+    assert "ask before creating more than one task doc" in skill
 
 
 def test_taskmd_revisit_requires_subagent_after_baseline() -> None:

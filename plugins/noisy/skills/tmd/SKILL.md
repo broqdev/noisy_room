@@ -1,9 +1,9 @@
 ---
 name: tmd
-description: Use one markdown task document under `.noisy_room/tasks/*.md` as durable task state. Use when the user invokes `$noisy:tmd`, `/noisy:tmd`, or asks to create, continue, revisit, refine, or track a task doc. Supports `-n`/`--new`, `-c`/`--continue`, `-rv`/`--revisit`, and `--revisit-n <N>`; also infer actions from natural language such as "create a task doc using 1.md as reference".
+description: Use one markdown task document under `.noisy_room/tasks/*.md` as durable task state. Use when the user invokes `$noisy:tmd`, `/noisy:tmd`, or asks to create, continue, revisit, refine, or track a task doc. Supports `-n`/`--new`, `-c`/`--continue`, `-rv`/`--revisit`, `-r`/`--round <N>`, and `--revisit-n <N>`; also infer actions from natural language such as "create a task doc using 1.md as reference".
 ---
 
-# Task MD
+# Task Markdown
 
 ## Purpose
 
@@ -24,11 +24,20 @@ Parse options and action flags first. Normalize short aliases before deciding th
 - `-n` / `--new`: create a task doc from the prompt and any referenced source docs.
 - `-c` / `--continue`: work on an existing task using its task doc as state.
 - `-rv` / `--revisit`: refresh an existing task doc without executing task work. Treat `-rv` as one exact alias, not combined short flags.
+- `-r <N>` / `--round <N>`: run the Taskmd dispatch loop `N` times in sequence. Use a positive integer; default is `1`.
 - `--revisit-n <N>`: override the default auto-revisit threshold for this invocation. Use a non-negative integer; `0` means always revisit before an inferred continue.
 
 Default auto-revisit threshold: 5 Worklog records after the latest `trigger: "revisit"` Worklog record.
 
 If any unsupported flag is present, report the supported flags and options. If conflicting supported action flags remain after alias normalization, ask the user to choose one.
+
+Dispatch rounds happen at this level, before action-specific work:
+
+- Each dispatch round is equivalent to manually invoking `$noisy:tmd ...` once from the current workspace state with the same prompt and normalized non-round options.
+- Before every dispatch round, reread the task doc if one exists, rerun target resolution, rerun intent inference when no action flag is present, and reapply the auto-revisit threshold from the latest Worklog state.
+- Do not collapse multiple rounds into one larger `Continue` or `Revisit`. Do not invoke `noisy:taskmd-rt` or alternate CLIs; `-r` / `--round` repeats this skill in the current agent.
+- If a dispatch round needs a user answer or hits a blocker, report the blocker and stop before remaining rounds.
+- If `New` creates a task doc in an earlier round and later rounds have no explicit action flag, continue from that task doc. If `-n` / `--new` is explicitly combined with multiple rounds, ask before creating more than one task doc.
 
 When no flag is present, infer intent:
 

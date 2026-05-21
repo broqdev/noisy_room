@@ -7,7 +7,7 @@ Local Codex plugin experiments for Noisy Room workflows.
 The active task document skill lives at:
 
 ```text
-plugins/noisy/skills/taskmd/SKILL.md
+plugins/noisy/skills/tmd/SKILL.md
 ```
 
 It is exposed to Codex as:
@@ -22,6 +22,15 @@ Use it with prompts such as:
 $noisy:tmd -n create a task doc use 1.md as reference
 ```
 
+To repeat the same Taskmd dispatch several times in the current agent:
+
+```text
+$noisy:tmd -c -r 3 .noisy_room/tasks/example.md advance the Roadmap
+```
+
+This is not roundtable execution: `-r` / `--round` repeats `noisy:tmd`
+dispatch locally instead of alternating Codex and Gemini CLI turns.
+
 ## Skill Discovery Finding
 
 Codex local skill discovery uses the namespace from the entry under
@@ -35,10 +44,10 @@ name: tmd
 For this repo, keep:
 
 ```text
-.codex/skills/noisy:tmd -> ../../plugins/noisy/skills/taskmd
+.codex/skills/noisy:tmd -> ../../plugins/noisy/skills/tmd
 ```
 
-Do not keep a parallel `.codex/skills/taskmd` alias unless you explicitly want to test the non-namespaced trigger. In testing, `noisy:tmd` appeared correctly, while the plain `taskmd` alias was not useful for the intended workflow.
+Do not keep a parallel `.codex/skills/tmd` alias unless you explicitly want to test the non-namespaced trigger. In testing, `noisy:tmd` appeared correctly, while the plain `tmd` alias was not useful for the intended workflow.
 
 ## Testing In Another Repo
 
@@ -46,7 +55,7 @@ To test the live skill from another workspace, create a symlink named `noisy:tmd
 
 ```sh
 mkdir -p /path/to/other-repo/.codex/skills
-ln -s /Users/xsapphire/pj_ml/pj_noisy_room/noisy_room/plugins/noisy/skills/taskmd \
+ln -s /Users/xsapphire/pj_ml/pj_noisy_room/noisy_room/plugins/noisy/skills/tmd \
   '/path/to/other-repo/.codex/skills/noisy:tmd'
 ```
 
@@ -54,7 +63,7 @@ For example, `pj_shadow-rogue-self-play-js` is wired as:
 
 ```text
 /Users/xsapphire/pj_ml/pj_shadow-rogue-self-play-js/.codex/skills/noisy:tmd
-  -> /Users/xsapphire/pj_ml/pj_noisy_room/noisy_room/plugins/noisy/skills/taskmd
+  -> /Users/xsapphire/pj_ml/pj_noisy_room/noisy_room/plugins/noisy/skills/tmd
 ```
 
 Start a fresh Codex session after changing `.codex/skills`; existing sessions may keep the old skill list.
@@ -78,7 +87,7 @@ The repo also provides a project command for the namespaced workflow:
 
 ```text
 .gemini/commands/noisy/tmd.toml -> /noisy:tmd
-.gemini/skills/tmd -> plugins/noisy/skills/taskmd
+.gemini/skills/tmd -> plugins/noisy/skills/tmd
 ```
 
 After changing Gemini wiring in an active session, reload both registries:

@@ -64,6 +64,7 @@ NOISY_KEEP_TEST_ENVS=1 uv run pytest
 - Roundtable discovery smoke test: verifies Codex sees `noisy:taskmd-rt` through the fake workspace symlink.
 - Roundtable shape test: verifies `noisy:taskmd-rt` uses direct skill logic instead of a helper script.
 - Taskmd shape test: verifies active Roadmap items use stable `R###` IDs plus required `created_at`, `deps`, `parallels`, `Rationale`, and `Task` fields.
+- Taskmd dispatch-round shape test: verifies `-r` / `--round` repeats top-level `noisy:tmd` dispatch without using roundtable delegation.
 - Roundtable fake-delegate test: invokes `noisy:taskmd-rt` through Codex and uses deterministic fake delegated CLIs to verify one round produces Gemini then Codex Worklog entries, even when Gemini prints a recovered edit-tool error before succeeding.
 - Roundtable real E2E test: opt-in scenario that invokes `noisy:taskmd-rt`, wraps the real `codex` and `gemini` binaries with logging shims, and asserts the delegated call log starts with real Gemini then real Codex.
 - Gemini wiring test: verifies the fake workspace sees `tmd` as the Agent Skill and `/noisy:tmd` as the custom command wrapper.
