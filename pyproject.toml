@@ -11,3 +11,10 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "fast: file-only and deterministic tests with no external CLI calls",
+    "cli_smoke: external CLI discovery tests that do not call a model",
+    "live_codex: model-backed Codex CLI behavior tests",
+    "live_roundtable: opt-in taskmd-rt tests that call both Codex and Gemini models",
+    "live_gemini: model-backed Gemini CLI behavior tests",
+]

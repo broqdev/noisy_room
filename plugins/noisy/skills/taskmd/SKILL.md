@@ -95,7 +95,9 @@ Every task doc must use exactly this top-level structure and order. Normalize ol
 { "agent": "codex-cli", "session_id": "<session-id>" }
 ```
 
-<Concrete next action and observable completion condition.>
+Rationale: <Why this is the right next task now.>
+
+Task: <Concrete next action and observable completion condition.>
 ````
 
 Rules:
@@ -108,6 +110,7 @@ Rules:
 - When normalizing legacy Worklog metadata without `trigger`, infer it only when the record clearly describes task work or doc-only review; ask before changing unclear historical metadata.
 - Generate stable `worklog_id` values for Worklog records. Add `worklog_id` to TODO or Archived metadata only when tied to a specific Worklog record.
 - Keep only active actionable items in `TODO`; archive completed, dropped, or superseded items with `type: "todo"`.
+- Every active `TODO` entry body must use `Rationale:` followed by `Task:`. Keep both non-empty and concise. Do not put these fields in metadata.
 - Archive stale knowledge/progress with `type: "knowledge"`.
 
 ## Existing Task Doc Baseline
@@ -117,7 +120,7 @@ For `Continue` and `Revisit / Refine`, establish this baseline before action-spe
 1. Inspect the prompt and recent context for an explicit `.noisy_room/tasks/*.md` path, an open/current task doc, a recently mentioned task doc, or another unambiguous candidate.
 2. Read any candidate doc and verify it is the target by checking whether `Goal`, `Progress`, active `TODO`, and the user's intent refer to the same task.
 3. Search `.noisy_room/tasks/*.md` only when no candidate is available, the candidate does not match, or multiple plausible docs remain. Ask if selection is still unclear.
-4. Normalize the doc to the mandatory contract if needed.
+4. Normalize the doc to the mandatory contract if needed. If an active `TODO` entry has a free-form body, rewrite it into `Rationale:` and `Task:` while preserving its meaning. Do not rewrite archived `type: "todo"` bodies unless malformed metadata blocks break parsing.
 5. Build the current-state picture from `Goal`, `Knowledge`, `Progress`, active `TODO`, and relevant `Archived` entries. Use `Archived` to avoid reviving completed, dropped, or superseded work unless current evidence makes it relevant again.
 
 ## Existing Task Doc Update Order
@@ -141,7 +144,7 @@ Create a task doc only; do not execute task work.
    - `Knowledge`: capture stable facts, assumptions, constraints, decisions, and references. List any source files, and note they are reference-only and must not be modified unless the user expands scope.
    - `Progress`: state that the task doc was created and implementation has not started.
    - `Worklog`: add an initial creation record with `trigger: "revisit"`, mentioning referenced source docs when used.
-   - `TODO`: add the first concrete next action. Do not include editing source files unless explicitly requested.
+   - `TODO`: add the first concrete next action as `Rationale:` and `Task:`. Do not include editing source files unless explicitly requested.
    - `Archived`: leave empty unless source material explicitly contains stale or superseded content.
 6. Report the created task doc path.
 
@@ -152,7 +155,7 @@ Work from an existing task doc, then update it.
 1. Establish `Existing Task Doc Baseline`.
 2. Choose the highest-priority active `TODO` that advances the `Goal` unless the user selected another item. If TODO is empty, infer the next step from the baseline state; ask if no safe next step is clear.
 3. Do the task work, using the task doc as the durable state throughout.
-4. Apply `Existing Task Doc Update Order` with `trigger: "todo"`. Make `Progress` reflect the work just completed, and make `TODO` reflect the next best step toward the `Goal`.
+4. Apply `Existing Task Doc Update Order` with `trigger: "todo"`. Make `Progress` reflect the work just completed, and make `TODO` reflect the next best step toward the `Goal` using `Rationale:` and `Task:`.
 5. Keep the task doc as the durable state, not a separate checklist.
 
 ## Action: Revisit / Refine
@@ -175,7 +178,7 @@ Refresh an existing task doc only; do not execute task work.
    - The Worklog must summarize the log range reviewed, whether external research was needed, and doc-only decisions.
    - If research ran, include the date used plus useful sources or rejected leads with dates when available.
    - If Goal Drift or loopholes were found, summarize them explicitly.
-   - Preserve valid content; rewrite stale or inaccurate `Knowledge`, `Progress`, and active `TODO`; add missing current information.
+   - Preserve valid content; rewrite stale or inaccurate `Knowledge`, `Progress`, and active `TODO`; add missing current information. Active `TODO` entries must use `Rationale:` and `Task:`.
 6. If Goal Drift or loophole patterns were found, correct them narrowly.
    - Add `Knowledge` guardrails that name the pattern and forbid repeating it.
    - Archive drifted, bypassing, completed, dropped, or superseded TODOs.

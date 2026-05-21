@@ -24,12 +24,13 @@ DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd"
 TASKMD_RT_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd-rt"
-TASKMD_RT_RUNNER = TASKMD_RT_SKILL_DIR / "scripts" / "run_roundtable.sh"
 GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "taskmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
 TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Progress", "Worklog", "Archived", "TODO"]
 DATED_ENTRY = re.compile(r"^### \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC - .+")
+TODO_RATIONALE = "Rationale:"
+TODO_TASK = "Task:"
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class CodexExecutionProfile:
     name: str
     flags: tuple[str, ...]
     timeout_seconds: int = 600
+    binary: str = "codex"
 
     def command(
         self,
@@ -47,7 +49,7 @@ class CodexExecutionProfile:
         output_schema: Path | None = None,
     ) -> list[str]:
         command = [
-            "codex",
+            self.binary,
             "exec",
             "-C",
             str(workspace),
@@ -235,6 +237,7 @@ class TestRun:
         *,
         label: str,
         profile: CodexExecutionProfile = PERMISSIVE_PROFILE,
+        env: Mapping[str, str] | None = None,
         output_last_message: Path | None = None,
         output_schema: Path | None = None,
     ) -> CommandResult:
@@ -251,6 +254,7 @@ class TestRun:
             result = self.run_command(
                 command,
                 label=label,
+                env=env,
                 timeout_seconds=profile.timeout_seconds,
             )
         except AssertionError as error:
@@ -359,7 +363,6 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
             "platform": platform.platform(),
             "repo_root": str(REPO_ROOT),
             "run_dir": str(self.run_dir),
-            "taskmd_rt_runner": str(TASKMD_RT_RUNNER),
             "taskmd_rt_skill_dir": str(TASKMD_RT_SKILL_DIR),
             "workspace": str(self.workspace),
             "taskmd_skill_dir": str(TASKMD_SKILL_DIR),
@@ -407,7 +410,7 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
         skill_root.mkdir(parents=True, exist_ok=True)
         skill_link = skill_root / "noisy:taskmd"
         skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
-        rt_skill_link = skill_root / "noisy:taskmd_rt"
+        rt_skill_link = skill_root / "noisy:taskmd-rt"
         rt_skill_link.symlink_to(TASKMD_RT_SKILL_DIR, target_is_directory=True)
 
     def _wire_gemini_skill(self) -> None:
@@ -471,8 +474,6 @@ def create_test_run(name: str) -> TestRun:
         raise AssertionError(f"Taskmd skill directory does not exist: {TASKMD_SKILL_DIR}")
     if not TASKMD_RT_SKILL_DIR.exists():
         raise AssertionError(f"Taskmd RT skill directory does not exist: {TASKMD_RT_SKILL_DIR}")
-    if not TASKMD_RT_RUNNER.exists():
-        raise AssertionError(f"Taskmd RT runner does not exist: {TASKMD_RT_RUNNER}")
     if not GEMINI_TASKMD_COMMAND.exists():
         raise AssertionError(f"Gemini taskmd command does not exist: {GEMINI_TASKMD_COMMAND}")
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
@@ -498,6 +499,11 @@ def validate_single_new_task_doc(workspace: Path, *, source_name: str) -> Path:
     task_doc = find_single_task_doc(workspace)
     validate_new_task_doc_contract(task_doc, source_name=source_name)
     return task_doc
+
+
+def metadata_records(task_doc: Path, section: str) -> list[dict[str, object]]:
+    assert section in TASK_DOC_SECTIONS, f"Unknown task doc section: {section}"
+    return _collect_metadata(task_doc.read_text(encoding="utf-8").splitlines())[section]
 
 
 def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
@@ -543,6 +549,7 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
     for record in todo_metadata:
         assert record.get("agent") == "codex-cli", f"Unexpected TODO agent: {record}"
         assert record.get("session_id"), f"TODO metadata should include session_id: {record}"
+    assert_todo_entries_have_rationale_and_task(lines)
 
 
 def assert_new_task_doc_side_effects(
@@ -589,6 +596,72 @@ def _collect_metadata(lines: list[str]) -> dict[str, list[dict[str, object]]]:
     return metadata
 
 
+def assert_todo_entries_have_rationale_and_task(lines: list[str]) -> None:
+    bodies = _entry_bodies(lines, "TODO")
+    assert bodies, "TODO should contain at least one entry"
+    for body in bodies:
+        body_lines = body.splitlines()
+        rationale_lines = [
+            index for index, line in enumerate(body_lines) if line.startswith(TODO_RATIONALE)
+        ]
+        task_lines = [
+            index for index, line in enumerate(body_lines) if line.startswith(TODO_TASK)
+        ]
+        assert len(rationale_lines) == 1, (
+            "TODO entry body should include exactly one 'Rationale:' line"
+        )
+        assert len(task_lines) == 1, "TODO entry body should include exactly one 'Task:' line"
+        rationale_index = rationale_lines[0]
+        task_index = task_lines[0]
+        assert rationale_index < task_index, "TODO entry body should put 'Rationale:' before 'Task:'"
+        preface = "\n".join(body_lines[:rationale_index]).strip()
+        assert not preface, "TODO entry body should start with 'Rationale:'"
+        rationale = "\n".join(
+            [
+                body_lines[rationale_index][len(TODO_RATIONALE):],
+                *body_lines[rationale_index + 1:task_index],
+            ]
+        ).strip()
+        task = "\n".join(
+            [body_lines[task_index][len(TODO_TASK):], *body_lines[task_index + 1:]]
+        ).strip()
+        assert rationale, "TODO entry Rationale should be non-empty"
+        assert task, "TODO entry Task should be non-empty"
+
+
+def _entry_bodies(lines: list[str], section: str) -> list[str]:
+    bodies: list[str] = []
+    current_section: str | None = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.startswith("## "):
+            current_section = line[3:].strip()
+            index += 1
+            continue
+        if current_section != section or not DATED_ENTRY.match(line):
+            index += 1
+            continue
+
+        cursor = index + 1
+        while cursor < len(lines) and not lines[cursor].strip():
+            cursor += 1
+        if cursor < len(lines) and lines[cursor].strip() == "```jsonl":
+            cursor += 3
+        while cursor < len(lines) and not lines[cursor].strip():
+            cursor += 1
+
+        body_lines: list[str] = []
+        while cursor < len(lines):
+            if lines[cursor].startswith("## ") or DATED_ENTRY.match(lines[cursor]):
+                break
+            body_lines.append(lines[cursor])
+            cursor += 1
+        bodies.append("\n".join(body_lines).strip())
+        index = cursor
+    return bodies
+
+
 def _read_jsonl_metadata(lines: list[str], heading_index: int, section: str) -> dict[str, object]:
     cursor = heading_index + 1
     while cursor < len(lines) and not lines[cursor].strip():
@@ -627,16 +700,16 @@ def assert_skill_symlink_wired(workspace: Path) -> None:
 
 
 def assert_taskmd_rt_skill_wired(workspace: Path) -> None:
-    skill_link = workspace / ".codex" / "skills" / "noisy:taskmd_rt"
-    assert skill_link.is_symlink(), f"Expected noisy:taskmd_rt to be a symlink: {skill_link}"
+    skill_link = workspace / ".codex" / "skills" / "noisy:taskmd-rt"
+    assert skill_link.is_symlink(), f"Expected noisy:taskmd-rt to be a symlink: {skill_link}"
     assert skill_link.resolve() == TASKMD_RT_SKILL_DIR.resolve(), (
-        f"Expected noisy:taskmd_rt to point at live skill {TASKMD_RT_SKILL_DIR}, got {skill_link.resolve()}"
+        f"Expected noisy:taskmd-rt to point at live skill {TASKMD_RT_SKILL_DIR}, got {skill_link.resolve()}"
     )
 
 
 def assert_taskmd_rt_discovered(result: CommandResult) -> None:
     result.assert_success()
-    assert "noisy:taskmd_rt" in result.stdout, "Codex prompt input did not include noisy:taskmd_rt"
+    assert "noisy:taskmd-rt" in result.stdout, "Codex prompt input did not include noisy:taskmd-rt"
 
 
 def assert_gemini_taskmd_wired(workspace: Path) -> None:

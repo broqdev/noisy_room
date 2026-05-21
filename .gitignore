@@ -12,4 +12,5 @@ tests/.runs/
 
 # local dev only
 .codex/
+.noisy_room/logs/
 CONTEXT.md
