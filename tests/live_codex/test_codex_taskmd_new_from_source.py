@@ -17,7 +17,7 @@ def test_noisy_taskmd_new_creates_task_doc_from_source(test_run_factory) -> None
     source = run.write_source("source.md", SOURCE_BRIEF)
     before = run.workspace_file_hashes()
     prompt = (
-        "$noisy:taskmd --new create a task doc using source.md as reference. "
+        "$noisy:tmd -n create a task doc using source.md as reference. "
         "Treat source.md as reference-only and do not modify it. "
         "Only create the task document; do not implement the described work."
     )

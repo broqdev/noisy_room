@@ -22,10 +22,6 @@ Exercise taskmd-rt roundtable orchestration with deterministic fake delegated CL
 - This workspace is a test environment.
 - Only `.noisy_room/tasks/roundtable-fake-delegates.md` should change.
 
-## Progress
-
-The task doc is ready for a one-round handoff.
-
 ## Worklog
 
 ### 2026-05-20 00:00:00 UTC - Seeded task doc
@@ -43,7 +39,7 @@ Seeded the task doc so the next roundtable turn should go to Gemini.
 ### R001 - Continue roundtable
 
 ```jsonl
-{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "agent": "codex-cli", "session_id": "seed" }
+{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "parallels": [], "agent": "codex-cli", "session_id": "seed" }
 ```
 
 Rationale: The seeded doc exists only to verify roundtable handoff behavior.

@@ -24,7 +24,7 @@
       "Write"
     ],
     "defaultPrompt": [
-      "$noisy:taskmd create a task doc use 1.md as reference"
+      "$noisy:tmd create a task doc use 1.md as reference"
     ],
     "screenshots": []
   }

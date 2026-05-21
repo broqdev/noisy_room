@@ -1,13 +1,13 @@
 ---
 name: taskmd-rt
-description: Run the Noisy Room task document workflow as a simple Codex/Gemini roundtable. Use when the user invokes `$noisy:taskmd-rt` or asks to alternate `noisy:taskmd` work between Codex CLI and Gemini CLI using one `.noisy_room/tasks/*.md` task doc. Supports `-r N` rounds; one round means two delegated CLI turns.
+description: Run the Noisy Room task document workflow as a simple Codex/Gemini roundtable. Use when the user invokes `$noisy:taskmd-rt` or asks to alternate `noisy:tmd` work between Codex CLI and Gemini CLI using one `.noisy_room/tasks/*.md` task doc. Supports `-r N` rounds; one round means two delegated CLI turns.
 ---
 
 # Taskmd Roundtable
 
 ## Purpose
 
-Alternate `noisy:taskmd` work between Codex CLI and Gemini CLI on one shared task doc.
+Alternate `noisy:tmd` work between Codex CLI and Gemini CLI on one shared task doc.
 
 This skill is procedural. Do not use a helper script. Run the CLI calls directly from Bash.
 The current agent is only the orchestrator once a task doc exists. Do not complete a delegated Codex or Gemini turn yourself.
@@ -26,7 +26,7 @@ One round means two delegated turns after a task doc exists. Two rounds means fo
 2. Resolve the task doc:
    - If the user provides a `.noisy_room/tasks/*.md` path, use it.
    - Otherwise, use the only task doc under `.noisy_room/tasks/`.
-   - If no task doc exists, run `noisy:taskmd` in the current agent to create or select one. Then continue with all `N` rounds.
+   - If no task doc exists, run `noisy:tmd` in the current agent to create or select one. Then continue with all `N` rounds.
 3. Resolve the workspace root:
    - Use the project directory that owns the task doc.
    - Keep the task doc path relative to that workspace root.
@@ -99,7 +99,7 @@ Limit the aggregate log to 100,000 lines. After a run completes, if the log is l
 For Codex CLI, run Bash like:
 
 ```sh
-codex exec --skip-git-repo-check --ephemeral --dangerously-bypass-approvals-and-sandbox -C "$workspace_root" '$noisy:taskmd .noisy_room/tasks/<task-doc>.md <user prompt>
+codex exec --skip-git-repo-check --ephemeral --dangerously-bypass-approvals-and-sandbox -C "$workspace_root" '$noisy:tmd .noisy_room/tasks/<task-doc>.md <user prompt>
 
 Roundtable turn <turn>/<total-turns>.
 Append a new Worklog entry before exiting.
@@ -111,7 +111,7 @@ Run delegated Codex in the Codex CLI equivalent of Gemini YOLO mode: `--dangerou
 For Gemini CLI, run Bash like:
 
 ```sh
-cd "$workspace_root" && GEMINI_CLI_TRUST_WORKSPACE=true gemini --skip-trust --approval-mode yolo "${gemini_include_args[@]}" --prompt '/noisy:taskmd .noisy_room/tasks/<task-doc>.md <user prompt>
+cd "$workspace_root" && GEMINI_CLI_TRUST_WORKSPACE=true gemini --skip-trust --approval-mode yolo "${gemini_include_args[@]}" --prompt '/noisy:tmd .noisy_room/tasks/<task-doc>.md <user prompt>
 
 Roundtable turn <turn>/<total-turns>.
 Append a new Worklog entry before exiting.

@@ -24,10 +24,6 @@ Exercise the real taskmd-rt roundtable flow with one shared task doc.
 - Only `.noisy_room/tasks/roundtable-real-e2e.md` should change.
 - Delegated Codex and Gemini turns should each append one Worklog entry.
 
-## Progress
-
-The task doc is ready for a one-round real handoff.
-
 ## Worklog
 
 ### 2026-05-20 00:00:00 UTC - Seeded task doc
@@ -45,7 +41,7 @@ Seeded the task doc so the next roundtable turn should go to Gemini.
 ### R001 - Continue real roundtable
 
 ```jsonl
-{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "agent": "codex-cli", "session_id": "seed" }
+{ "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "parallels": [], "agent": "codex-cli", "session_id": "seed" }
 ```
 
 Rationale: The seeded doc exists only to verify the real roundtable handoff behavior.

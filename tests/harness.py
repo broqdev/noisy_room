@@ -24,10 +24,10 @@ DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd"
 TASKMD_RT_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd-rt"
-GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "taskmd.toml"
+GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "tmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
-TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Progress", "Worklog", "Archived", "Roadmap"]
+TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Worklog", "Archived", "Roadmap"]
 DATED_ENTRY = re.compile(r"^### \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC - .+")
 ROADMAP_ENTRY = re.compile(r"^### (R\d{3}) - .+")
 UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$")
@@ -318,7 +318,6 @@ Return JSON matching the provided schema. Set passed=true only when all are true
 - The generated task doc clearly represents task planning/state, not completed implementation.
 - Knowledge captures stable constraints or references from the source brief.
 - Knowledge treats the source brief as reference-only and does not expand scope to editing it.
-- Progress says the task doc was created and implementation has not started, or an equivalent current-state statement.
 - Roadmap contains at least one concrete next action that would advance the source brief's work.
 - Roadmap does not tell the next agent to edit the source brief unless the source brief explicitly requested that.
 
@@ -411,7 +410,7 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
     def _wire_codex_skill(self) -> None:
         skill_root = self.workspace / ".codex" / "skills"
         skill_root.mkdir(parents=True, exist_ok=True)
-        skill_link = skill_root / "noisy:taskmd"
+        skill_link = skill_root / "noisy:tmd"
         skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
         rt_skill_link = skill_root / "noisy:taskmd-rt"
         rt_skill_link.symlink_to(TASKMD_RT_SKILL_DIR, target_is_directory=True)
@@ -419,12 +418,12 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
     def _wire_gemini_skill(self) -> None:
         skill_root = self.workspace / ".gemini" / "skills"
         skill_root.mkdir(parents=True, exist_ok=True)
-        skill_link = skill_root / "taskmd"
+        skill_link = skill_root / "tmd"
         skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
 
         command_root = self.workspace / ".gemini" / "commands" / "noisy"
         command_root.mkdir(parents=True, exist_ok=True)
-        command_link = command_root / "taskmd.toml"
+        command_link = command_root / "tmd.toml"
         command_link.symlink_to(GEMINI_TASKMD_COMMAND)
 
     def _write_command_artifacts(self, result: CommandResult) -> None:
@@ -478,7 +477,7 @@ def create_test_run(name: str) -> TestRun:
     if not TASKMD_RT_SKILL_DIR.exists():
         raise AssertionError(f"Taskmd RT skill directory does not exist: {TASKMD_RT_SKILL_DIR}")
     if not GEMINI_TASKMD_COMMAND.exists():
-        raise AssertionError(f"Gemini taskmd command does not exist: {GEMINI_TASKMD_COMMAND}")
+        raise AssertionError(f"Gemini tmd command does not exist: {GEMINI_TASKMD_COMMAND}")
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     return TestRun(name)
 
@@ -617,10 +616,11 @@ def assert_roadmap_entries_have_required_shape(lines: list[str]) -> None:
             f"Roadmap metadata created_at should be a UTC timestamp: {metadata}"
         )
         assert "updated_at" not in metadata, f"Roadmap metadata should not include updated_at: {metadata}"
-        deps = metadata.get("deps")
-        assert isinstance(deps, list) and all(
-            isinstance(dep, str) and ROADMAP_ID.match(dep) for dep in deps
-        ), f"Roadmap metadata deps should be an array of R### ids: {metadata}"
+        for field in ("deps", "parallels"):
+            values = metadata.get(field)
+            assert isinstance(values, list) and all(
+                isinstance(value, str) and ROADMAP_ID.match(value) for value in values
+            ), f"Roadmap metadata {field} should be an array of R### ids: {metadata}"
         body_lines = body.splitlines()
         rationale_lines = [
             index for index, line in enumerate(body_lines) if line.startswith(ROADMAP_RATIONALE)
@@ -717,14 +717,14 @@ def _read_jsonl_metadata(lines: list[str], heading_index: int, section: str) -> 
 
 def assert_noisy_taskmd_discovered(result: CommandResult) -> None:
     result.assert_success()
-    assert "noisy:taskmd" in result.stdout, "Codex prompt input did not include noisy:taskmd"
+    assert "noisy:tmd" in result.stdout, "Codex prompt input did not include noisy:tmd"
 
 
 def assert_skill_symlink_wired(workspace: Path) -> None:
-    skill_link = workspace / ".codex" / "skills" / "noisy:taskmd"
-    assert skill_link.is_symlink(), f"Expected noisy:taskmd to be a symlink: {skill_link}"
+    skill_link = workspace / ".codex" / "skills" / "noisy:tmd"
+    assert skill_link.is_symlink(), f"Expected noisy:tmd to be a symlink: {skill_link}"
     assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
-        f"Expected noisy:taskmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
+        f"Expected noisy:tmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
     )
 
 
@@ -742,14 +742,14 @@ def assert_taskmd_rt_discovered(result: CommandResult) -> None:
 
 
 def assert_gemini_taskmd_wired(workspace: Path) -> None:
-    skill_link = workspace / ".gemini" / "skills" / "taskmd"
-    assert skill_link.is_symlink(), f"Expected taskmd to be a symlink: {skill_link}"
+    skill_link = workspace / ".gemini" / "skills" / "tmd"
+    assert skill_link.is_symlink(), f"Expected tmd to be a symlink: {skill_link}"
     assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
-        f"Expected taskmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
+        f"Expected tmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
     )
 
-    command_link = workspace / ".gemini" / "commands" / "noisy" / "taskmd.toml"
-    assert command_link.is_symlink(), f"Expected /noisy:taskmd command to be a symlink: {command_link}"
+    command_link = workspace / ".gemini" / "commands" / "noisy" / "tmd.toml"
+    assert command_link.is_symlink(), f"Expected /noisy:tmd command to be a symlink: {command_link}"
     assert command_link.resolve() == GEMINI_TASKMD_COMMAND.resolve(), (
         f"Expected Gemini command to point at {GEMINI_TASKMD_COMMAND}, got {command_link.resolve()}"
     )
@@ -757,11 +757,11 @@ def assert_gemini_taskmd_wired(workspace: Path) -> None:
 
 def assert_gemini_taskmd_discovered(result: CommandResult) -> None:
     result.assert_success()
-    assert re.search(r"^taskmd\s+\[Enabled\]", result.stdout, re.MULTILINE), (
-        "Gemini skills list did not include taskmd as an enabled skill"
+    assert re.search(r"^tmd\s+\[Enabled\]", result.stdout, re.MULTILINE), (
+        "Gemini skills list did not include tmd as an enabled skill"
     )
-    assert not re.search(r"^noisy:taskmd\s+\[", result.stdout, re.MULTILINE), (
-        "Gemini should discover the skill as taskmd; noisy:taskmd is the custom command name"
+    assert not re.search(r"^noisy:tmd\s+\[", result.stdout, re.MULTILINE), (
+        "Gemini should discover the skill as tmd; noisy:tmd is the custom command name"
     )
 
 
