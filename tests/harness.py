@@ -23,7 +23,6 @@ TESTS_DIR = REPO_ROOT / "tests"
 DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "tmd"
-TASKMD_RT_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "taskmd-rt"
 GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "tmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
@@ -77,11 +76,21 @@ PERMISSIVE_PROFILE = CodexExecutionProfile(
     ),
 )
 
+CODEX_JSON_PROFILE = CodexExecutionProfile(
+    name="permissive-bypass-json",
+    flags=(
+        *PERMISSIVE_PROFILE.flags,
+        "--json",
+    ),
+    timeout_seconds=900,
+)
+
 
 @dataclass(frozen=True)
 class GeminiExecutionProfile:
     name: str
     flags: tuple[str, ...]
+    output_format: str = "text"
     timeout_seconds: int = 600
 
     def command(self, prompt: str) -> list[str]:
@@ -90,7 +99,7 @@ class GeminiExecutionProfile:
             "--prompt",
             prompt,
             "--output-format",
-            "text",
+            self.output_format,
             *self.flags,
         ]
 
@@ -102,6 +111,12 @@ GEMINI_YOLO_PROFILE = GeminiExecutionProfile(
         "--approval-mode",
         "yolo",
     ),
+)
+
+GEMINI_YOLO_STREAM_PROFILE = GeminiExecutionProfile(
+    name="gemini-yolo-stream",
+    flags=GEMINI_YOLO_PROFILE.flags,
+    output_format="stream-json",
 )
 
 
@@ -335,26 +350,8 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
     def _write_run_metadata(self) -> None:
         codex_path = shutil.which("codex")
         gemini_path = shutil.which("gemini")
-        codex_version = ""
-        gemini_version = ""
-        if codex_path:
-            version_result = subprocess.run(
-                [codex_path, "--version"],
-                text=True,
-                capture_output=True,
-                timeout=10,
-                check=False,
-            )
-            codex_version = (version_result.stdout or version_result.stderr).strip()
-        if gemini_path:
-            version_result = subprocess.run(
-                [gemini_path, "--version"],
-                text=True,
-                capture_output=True,
-                timeout=10,
-                check=False,
-            )
-            gemini_version = (version_result.stdout or version_result.stderr).strip()
+        codex_version = _version_string(codex_path)
+        gemini_version = _version_string(gemini_path)
         metadata = {
             "codex_path": codex_path,
             "codex_version": codex_version,
@@ -365,7 +362,6 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
             "platform": platform.platform(),
             "repo_root": str(REPO_ROOT),
             "run_dir": str(self.run_dir),
-            "taskmd_rt_skill_dir": str(TASKMD_RT_SKILL_DIR),
             "workspace": str(self.workspace),
             "taskmd_skill_dir": str(TASKMD_SKILL_DIR),
             "runs_dir_env": os.environ.get("NOISY_TEST_RUNS_DIR"),
@@ -412,8 +408,6 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
         skill_root.mkdir(parents=True, exist_ok=True)
         skill_link = skill_root / "noisy:tmd"
         skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
-        rt_skill_link = skill_root / "noisy:taskmd-rt"
-        rt_skill_link.symlink_to(TASKMD_RT_SKILL_DIR, target_is_directory=True)
 
     def _wire_gemini_skill(self) -> None:
         skill_root = self.workspace / ".gemini" / "skills"
@@ -471,11 +465,25 @@ def _safe_label(label: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_.-]+", "-", label).strip("-")
 
 
+def _version_string(binary_path: str | None) -> str:
+    if not binary_path:
+        return ""
+    try:
+        version_result = subprocess.run(
+            [binary_path, "--version"],
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return f"<version unavailable: {type(error).__name__}: {error}>"
+    return (version_result.stdout or version_result.stderr).strip()
+
+
 def create_test_run(name: str) -> TestRun:
     if not TASKMD_SKILL_DIR.exists():
         raise AssertionError(f"Taskmd skill directory does not exist: {TASKMD_SKILL_DIR}")
-    if not TASKMD_RT_SKILL_DIR.exists():
-        raise AssertionError(f"Taskmd RT skill directory does not exist: {TASKMD_RT_SKILL_DIR}")
     if not GEMINI_TASKMD_COMMAND.exists():
         raise AssertionError(f"Gemini tmd command does not exist: {GEMINI_TASKMD_COMMAND}")
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
@@ -497,9 +505,14 @@ def find_single_task_doc(workspace: Path) -> Path:
     return task_doc
 
 
-def validate_single_new_task_doc(workspace: Path, *, source_name: str) -> Path:
+def validate_single_new_task_doc(
+    workspace: Path,
+    *,
+    source_name: str,
+    expected_agent: str = "codex-cli",
+) -> Path:
     task_doc = find_single_task_doc(workspace)
-    validate_new_task_doc_contract(task_doc, source_name=source_name)
+    validate_new_task_doc_contract(task_doc, source_name=source_name, expected_agent=expected_agent)
     return task_doc
 
 
@@ -508,7 +521,150 @@ def metadata_records(task_doc: Path, section: str) -> list[dict[str, object]]:
     return _collect_metadata(task_doc.read_text(encoding="utf-8").splitlines())[section]
 
 
-def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
+def codex_stream_events(result: CommandResult) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    for line_number, line in enumerate(result.stdout.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or not stripped.startswith("{"):
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError as error:
+            raise AssertionError(
+                f"Codex JSON stdout line {line_number} starts like JSON but is invalid: {line}"
+            ) from error
+        assert isinstance(event, dict), (
+            f"Codex JSON stdout line {line_number} should decode to an object: {line}"
+        )
+        events.append(event)
+    assert events, "Codex --json stdout should contain JSON events"
+    return events
+
+
+def codex_stream_assistant_text(events: Iterable[Mapping[str, object]]) -> str:
+    chunks: list[str] = []
+    for event in events:
+        if event.get("type") != "item.completed":
+            continue
+        item = event.get("item")
+        if not isinstance(item, Mapping) or item.get("type") != "agent_message":
+            continue
+        text = item.get("text")
+        if isinstance(text, str):
+            chunks.append(text)
+    return "\n".join(chunks)
+
+
+def assert_codex_stream_spawned_subagents(
+    events: Iterable[Mapping[str, object]],
+    *,
+    min_count: int,
+) -> None:
+    event_list = list(events)
+    spawned_thread_ids: list[str] = []
+    for event in event_list:
+        if event.get("type") != "item.completed":
+            continue
+        item = event.get("item")
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("type") != "collab_tool_call" or item.get("tool") != "spawn_agent":
+            continue
+        receiver_thread_ids = item.get("receiver_thread_ids")
+        if isinstance(receiver_thread_ids, list):
+            spawned_thread_ids.extend(
+                thread_id for thread_id in receiver_thread_ids if isinstance(thread_id, str)
+            )
+    assert len(spawned_thread_ids) >= min_count, (
+        f"Codex should spawn at least {min_count} subagent thread(s); "
+        f"saw spawned thread ids: {spawned_thread_ids}"
+    )
+
+    completed_thread_ids: set[str] = set()
+    for event in event_list:
+        if event.get("type") != "item.completed":
+            continue
+        item = event.get("item")
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("type") != "collab_tool_call" or item.get("tool") != "wait":
+            continue
+        agents_states = item.get("agents_states")
+        if not isinstance(agents_states, Mapping):
+            continue
+        for thread_id, state in agents_states.items():
+            if isinstance(thread_id, str) and isinstance(state, Mapping):
+                if state.get("status") == "completed":
+                    completed_thread_ids.add(thread_id)
+    assert len(completed_thread_ids) >= min_count, (
+        f"Codex should wait for at least {min_count} completed subagent thread(s); "
+        f"saw completed thread ids: {sorted(completed_thread_ids)}"
+    )
+
+
+def gemini_stream_events(result: CommandResult) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    for line_number, line in enumerate(result.stdout.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise AssertionError(
+                f"Gemini stream-json stdout line {line_number} is not valid JSON: {line}"
+            ) from error
+        assert isinstance(event, dict), (
+            f"Gemini stream-json stdout line {line_number} should decode to an object: {line}"
+        )
+        events.append(event)
+    assert events, "Gemini stream-json stdout should contain events"
+    return events
+
+
+def gemini_stream_assistant_text(events: Iterable[Mapping[str, object]]) -> str:
+    chunks: list[str] = []
+    for event in events:
+        if event.get("type") == "message" and event.get("role") == "assistant":
+            content = event.get("content")
+            if isinstance(content, str):
+                chunks.append(content)
+    return "".join(chunks)
+
+
+def assert_gemini_stream_invoked_subagent(
+    events: Iterable[Mapping[str, object]],
+    *,
+    agent_name: str,
+    min_count: int = 1,
+) -> None:
+    event_list = list(events)
+    invoke_events: list[Mapping[str, object]] = []
+    for event in event_list:
+        if event.get("type") != "tool_use" or event.get("tool_name") != "invoke_agent":
+            continue
+        parameters = event.get("parameters")
+        if isinstance(parameters, Mapping):
+            invoke_events.append(parameters)
+    matching_events = [
+        parameters for parameters in invoke_events if parameters.get("agent_name") == agent_name
+    ]
+    assert len(matching_events) >= min_count, (
+        f"Gemini should invoke the {agent_name!r} subagent via invoke_agent "
+        f"at least {min_count} time(s); "
+        f"saw invoke_agent parameters: {invoke_events}"
+    )
+    assert any(
+        event.get("type") == "result" and event.get("status") == "success"
+        for event in event_list
+    ), "Gemini stream-json should finish with a success result event"
+
+
+def validate_new_task_doc_contract(
+    task_doc: Path,
+    *,
+    source_name: str,
+    expected_agent: str = "codex-cli",
+) -> None:
     text = task_doc.read_text(encoding="utf-8")
     lines = text.splitlines()
 
@@ -525,12 +681,16 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
     roadmap = section_text["Roadmap"].lower()
     assert source_name in section_text["Knowledge"], f"Knowledge should list {source_name!r}"
     assert "reference" in knowledge, "Knowledge should mark source docs as reference material"
-    assert ("do not" in knowledge or "must not" in knowledge) and (
+    source_is_read_only = "read-only" in knowledge
+    source_has_no_edit_warning = ("do not" in knowledge or "must not" in knowledge) and (
         "modify" in knowledge
         or "modified" in knowledge
         or "modification" in knowledge
         or "edit" in knowledge
-    ), "Knowledge should say the source/reference docs must not be modified"
+    )
+    assert source_is_read_only or source_has_no_edit_warning, (
+        "Knowledge should say the source/reference docs must not be modified"
+    )
     assert not re.search(rf"\b(edit|modify|update|change)\b[^\n]*\b{re.escape(source_name.lower())}\b", roadmap), (
         f"Roadmap should not ask future work to edit {source_name!r}"
     )
@@ -542,14 +702,14 @@ def validate_new_task_doc_contract(task_doc: Path, *, source_name: str) -> None:
         "Creation Worklog metadata should only include trigger='revisit'"
     )
     for record in worklog_metadata:
-        assert record.get("agent") == "codex-cli", f"Unexpected Worklog agent: {record}"
+        assert record.get("agent") == expected_agent, f"Unexpected Worklog agent: {record}"
         assert record.get("session_id"), f"Worklog metadata should include session_id: {record}"
         assert record.get("worklog_id"), f"Worklog metadata should include worklog_id: {record}"
 
     roadmap_metadata = metadata_by_section["Roadmap"]
     assert roadmap_metadata, "Creation should add at least one Roadmap record"
     for record in roadmap_metadata:
-        assert record.get("agent") == "codex-cli", f"Unexpected Roadmap agent: {record}"
+        assert record.get("agent") == expected_agent, f"Unexpected Roadmap agent: {record}"
         assert record.get("session_id"), f"Roadmap metadata should include session_id: {record}"
     assert_roadmap_entries_have_required_shape(lines)
 
@@ -598,8 +758,14 @@ def _collect_metadata(lines: list[str]) -> dict[str, list[dict[str, object]]]:
     return metadata
 
 
-def assert_roadmap_entries_have_required_shape(lines: list[str]) -> None:
+def assert_roadmap_entries_have_required_shape(
+    lines: list[str],
+    *,
+    allow_empty: bool = False,
+) -> None:
     entries = _entries(lines, "Roadmap")
+    if allow_empty and not entries:
+        return
     assert entries, "Roadmap should contain at least one entry"
     seen_ids: set[str] = set()
     for heading, metadata, body in entries:
@@ -726,19 +892,6 @@ def assert_skill_symlink_wired(workspace: Path) -> None:
     assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
         f"Expected noisy:tmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
     )
-
-
-def assert_taskmd_rt_skill_wired(workspace: Path) -> None:
-    skill_link = workspace / ".codex" / "skills" / "noisy:taskmd-rt"
-    assert skill_link.is_symlink(), f"Expected noisy:taskmd-rt to be a symlink: {skill_link}"
-    assert skill_link.resolve() == TASKMD_RT_SKILL_DIR.resolve(), (
-        f"Expected noisy:taskmd-rt to point at live skill {TASKMD_RT_SKILL_DIR}, got {skill_link.resolve()}"
-    )
-
-
-def assert_taskmd_rt_discovered(result: CommandResult) -> None:
-    result.assert_success()
-    assert "noisy:taskmd-rt" in result.stdout, "Codex prompt input did not include noisy:taskmd-rt"
 
 
 def assert_gemini_taskmd_wired(workspace: Path) -> None:

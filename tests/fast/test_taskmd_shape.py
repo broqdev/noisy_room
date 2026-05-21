@@ -32,7 +32,8 @@ def test_taskmd_requires_structured_roadmap_items() -> None:
     assert 'trigger: "roadmap"' in skill
     assert 'trigger: "todo"' in skill
     assert "`parallels` is context for compatible work" in skill
-    assert "one subagent per compatible Roadmap item and run them in parallel" in skill
+    assert "scanning every active Roadmap item for a useful parallel execution wave" in skill
+    assert "default to launching one subagent per Roadmap item in the same wave" in skill
 
 
 def test_taskmd_documents_action_flag_aliases() -> None:
@@ -57,7 +58,7 @@ def test_taskmd_rounds_repeat_dispatch_level() -> None:
     assert "rerun intent inference" in skill
     assert "reapply the auto-revisit threshold" in skill
     assert "Do not collapse multiple rounds into one larger `Continue` or `Revisit`" in skill
-    assert "Do not invoke `noisy:taskmd-rt` or alternate CLIs" in skill
+    assert "Do not alternate external CLI agents" in skill
     assert "ask before creating more than one task doc" in skill
 
 

@@ -16,14 +16,13 @@ Run by speed group:
 uv run pytest tests/fast
 uv run pytest tests/cli_smoke
 uv run pytest tests/live_codex
-NOISY_RUN_TASKMD_RT_E2E=1 uv run pytest tests/live_roundtable
 NOISY_RUN_GEMINI_E2E=1 uv run pytest tests/live_gemini
 ```
 
 Each test case lives in its own file, so a single scenario can run directly:
 
 ```sh
-uv run pytest tests/fast/test_taskmd_rt_shape.py
+uv run pytest tests/fast/test_taskmd_shape.py
 ```
 
 ## Shape
@@ -31,7 +30,6 @@ uv run pytest tests/fast/test_taskmd_rt_shape.py
 - `tests/fast/` contains file-only and generated-workspace checks with no external CLI calls.
 - `tests/cli_smoke/` contains CLI discovery smoke tests without model calls.
 - `tests/live_codex/` contains model-backed Codex behavior tests.
-- `tests/live_roundtable/` contains opt-in taskmd-rt E2E tests that call both Codex and Gemini.
 - `tests/live_gemini/` contains opt-in model-backed Gemini behavior tests.
 - `tests/scenario_data.py` contains shared scenario markdown fixtures.
 - `tests/harness.py` creates minimal fake workspaces, wires `.codex/skills/noisy:tmd` and `.gemini/skills/tmd` as symlinks to the live skill, runs CLIs, and validates outputs.
@@ -61,23 +59,21 @@ NOISY_KEEP_TEST_ENVS=1 uv run pytest
 ## Current Coverage
 
 - Discovery smoke test: verifies Codex sees `noisy:tmd` through the fake workspace symlink.
-- Roundtable discovery smoke test: verifies Codex sees `noisy:taskmd-rt` through the fake workspace symlink.
-- Roundtable shape test: verifies `noisy:taskmd-rt` uses direct skill logic instead of a helper script.
 - Taskmd shape test: verifies active Roadmap items use stable `R###` IDs plus required `created_at`, `deps`, `parallels`, `Rationale`, and `Task` fields.
-- Taskmd dispatch-round shape test: verifies `-r` / `--round` repeats top-level `noisy:tmd` dispatch without using roundtable delegation.
-- Roundtable fake-delegate test: invokes `noisy:taskmd-rt` through Codex and uses deterministic fake delegated CLIs to verify one round produces Gemini then Codex Worklog entries, even when Gemini prints a recovered edit-tool error before succeeding.
-- Roundtable real E2E test: opt-in scenario that invokes `noisy:taskmd-rt`, wraps the real `codex` and `gemini` binaries with logging shims, and asserts the delegated call log starts with real Gemini then real Codex.
+- Taskmd dispatch-round shape test: verifies `-r` / `--round` repeats top-level `noisy:tmd` dispatch locally.
 - Gemini wiring test: verifies the fake workspace sees `tmd` as the Agent Skill and `/noisy:tmd` as the custom command wrapper.
 - Gemini discovery smoke test: verifies `gemini skills list --all` sees `tmd` without making a model call.
 - New task doc scenario: invokes `$noisy:tmd -n` with `source.md`, validates the required markdown contract, then asks a Codex verifier for a structured semantic pass/fail result.
+- Codex Continue subagent scenario: invokes `$noisy:tmd -c` through Codex CLI `--json` on a task doc with two compatible parallel Roadmap items, asserts Codex emitted `spawn_agent` and `wait` collab tool events for at least two subagents, and checks both task work and the task doc Worklog.
+- Gemini Revisit subagent scenario: opt-in live Gemini CLI test that invokes `/noisy:tmd -rv` with `stream-json`, asserts Gemini emitted an `invoke_agent` tool event for the `generalist` subagent, and checks the task doc Worklog records the delegation.
+- Gemini Continue subagent scenario: opt-in live Gemini CLI test that invokes `/noisy:tmd -c` on a task doc with two compatible parallel Roadmap items, asserts Gemini emitted two `invoke_agent` tool events for the `generalist` subagent, and checks both task work and the task doc Worklog.
 
 ## Optional Gemini Behavior
 
 Set these to run optional live model scenarios:
 
 ```sh
-NOISY_RUN_TASKMD_RT_E2E=1 uv run pytest tests/live_roundtable
 NOISY_RUN_GEMINI_E2E=1 uv run pytest tests/live_gemini
 ```
 
-The roundtable scenario invokes `$noisy:taskmd-rt -r 1` through Codex and proves the delegated `gemini` and `codex` commands ran before validating the task doc. The Gemini scenario invokes `/noisy:tmd -n` through Gemini CLI, validates the generated task doc with the same deterministic checks, and then reuses the Codex semantic verifier.
+The Codex Continue scenario invokes `$noisy:tmd` through Codex CLI and proves delegation through streamed `--json` collab tool events. The Gemini scenarios invoke `/noisy:tmd` through Gemini CLI. The New scenario validates the generated task doc with the same deterministic checks and then reuses the Codex semantic verifier. The Gemini Revisit and Continue scenarios check the required subagent delegation paths with Gemini's streamed tool events.

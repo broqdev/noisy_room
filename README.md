@@ -28,8 +28,8 @@ To repeat the same Taskmd dispatch several times in the current agent:
 $noisy:tmd -c -r 3 .noisy_room/tasks/example.md advance the Roadmap
 ```
 
-This is not roundtable execution: `-r` / `--round` repeats `noisy:tmd`
-dispatch locally instead of alternating Codex and Gemini CLI turns.
+This is local dispatch repetition: `-r` / `--round` repeats `noisy:tmd`
+inside the current agent instead of alternating external CLI agents.
 
 ## Skill Discovery Finding
 
@@ -108,57 +108,4 @@ Use the Gemini command with the same task-doc arguments:
 
 ```text
 /noisy:tmd -n create a task doc using 1.md as reference
-```
-
-## Taskmd Roundtable Skill
-
-The roundtable skill lives at:
-
-```text
-plugins/noisy/skills/taskmd-rt/SKILL.md
-```
-
-It is exposed to Codex as:
-
-```text
-noisy:taskmd-rt
-```
-
-Use it to alternate an existing task doc between Codex CLI and Gemini CLI:
-
-```text
-$noisy:taskmd-rt -r 1 .noisy_room/tasks/example.md continue from the active Roadmap
-```
-
-One `-r` round means two delegated `noisy:tmd` CLI turns after a task doc
-exists. If no task doc exists, `noisy:taskmd-rt` bootstraps by delegating to
-`noisy:tmd`; that creation step does not consume a round.
-
-The skill uses procedural instructions in `SKILL.md`, not a helper script. After
-each CLI turn, it verifies that the task doc gained a new Worklog record from
-the CLI that just ran. A successful command exit is not enough.
-
-Delegated CLI turns must run from the workspace root that owns the task doc.
-Codex uses `-C <workspace-root>` with `--dangerously-bypass-approvals-and-sandbox`
-to match Gemini YOLO mode, and Gemini is launched after changing into that
-directory with `GEMINI_CLI_TRUST_WORKSPACE=true`, so Gemini checks trust against
-the project being worked on instead of the skill/plugin checkout.
-When a task doc names an external reference repo that Gemini may inspect,
-`taskmd-rt` passes that repo with `--include-directories`; do not include broad
-parent directories unless the user explicitly asks.
-
-Each task doc gets one default-on aggregate roundtable log:
-
-```text
-.noisy_room/logs/<task-doc-stem>.taskmd-rt.log
-```
-
-The log appends every run for that task doc, captures combined delegated CLI
-output, and is capped at 100,000 lines by keeping the newest lines after a run
-completes.
-
-For this repo, keep:
-
-```text
-.codex/skills/noisy:taskmd-rt -> ../../plugins/noisy/skills/taskmd-rt
 ```

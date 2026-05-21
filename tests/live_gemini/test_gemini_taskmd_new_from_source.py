@@ -34,7 +34,11 @@ def test_gemini_noisy_taskmd_new_creates_task_doc_from_source(test_run_factory) 
     )
 
     result.assert_success()
-    task_doc = validate_single_new_task_doc(run.workspace, source_name="source.md")
+    task_doc = validate_single_new_task_doc(
+        run.workspace,
+        source_name="source.md",
+        expected_agent="gemini-cli",
+    )
     assert_new_task_doc_side_effects(run, before=before, task_doc=task_doc)
     verifier_result = run.verify_new_task_doc_semantics(source=source, task_doc=task_doc)
 

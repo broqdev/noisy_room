@@ -35,7 +35,7 @@ Dispatch rounds happen at this level, before action-specific work:
 
 - Each dispatch round is equivalent to manually invoking `$noisy:tmd ...` once from the current workspace state with the same prompt and normalized non-round options.
 - Before every dispatch round, reread the task doc if one exists, rerun target resolution, rerun intent inference when no action flag is present, and reapply the auto-revisit threshold from the latest Worklog state.
-- Do not collapse multiple rounds into one larger `Continue` or `Revisit`. Do not invoke `noisy:taskmd-rt` or alternate CLIs; `-r` / `--round` repeats this skill in the current agent.
+- Do not collapse multiple rounds into one larger `Continue` or `Revisit`. Do not alternate external CLI agents; `-r` / `--round` repeats this skill in the current agent.
 - If a dispatch round needs a user answer or hits a blocker, report the blocker and stop before remaining rounds.
 - If `New` creates a task doc in an earlier round and later rounds have no explicit action flag, continue from that task doc. If `-n` / `--new` is explicitly combined with multiple rounds, ask before creating more than one task doc.
 
@@ -162,8 +162,8 @@ Create a task doc only; do not execute task work.
 Work from an existing task doc, then update it.
 
 1. Establish `Existing Task Doc Baseline`.
-2. Choose the execution set: the highest-priority Roadmap item that advances the `Goal` unless the user selected another item, plus any `parallels` items that are still relevant, compatible, and not blocked by `deps`. Treat unchosen Roadmap items as plan context to preserve or update, not as stale content. If Roadmap is empty, infer the next step from the baseline state; ask if no safe next step is clear.
-3. Do the task work, using the task doc as the durable state throughout. When the execution set has multiple parallel items and subagents are available, prefer one subagent per compatible Roadmap item and run them in parallel. If parallel execution is unsafe or unavailable, execute the safe subset and preserve the rest in Roadmap.
+2. Choose the execution set by first scanning every active Roadmap item for a useful parallel execution wave. Start with the highest-priority Roadmap item that advances the `Goal` unless the user selected another item, then actively include any `parallels` items, and any other independent Roadmap items, that are still relevant, compatible, and not blocked by `deps`. Treat unchosen Roadmap items as plan context to preserve or update, not as stale content. If Roadmap is empty, infer the next step from the baseline state; ask if no safe next step is clear.
+3. Do the task work, using the task doc as the durable state throughout. When the execution set has multiple compatible items and subagents are available, default to launching one subagent per Roadmap item in the same wave and continue locally only on coordination, integration, or a non-overlapping item. Do not collapse parallel Roadmap items into one serial local task just because one item is the highest priority. If parallel execution is unsafe, unavailable, or blocked by shared write scopes, explain why, execute the safe subset, and preserve the rest in Roadmap.
 4. Apply `Existing Task Doc Update Order` with `trigger: "roadmap"`. Make the Worklog record describe the work just completed. Update the full Roadmap set so it keeps every still-relevant item, archives the selected item when completed, revises changed items, and adds multiple next items when the task now has multiple useful tracks.
 5. Keep the task doc as the durable state, not a separate checklist.
 
