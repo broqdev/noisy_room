@@ -28,11 +28,14 @@ VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
 TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Worklog", "Archived", "Roadmap"]
 DATED_ENTRY = re.compile(r"^### \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC - .+")
-ROADMAP_ENTRY = re.compile(r"^### (R\d{3}) - .+")
+ROADMAP_ID_PATTERN = r"(?:R\d{3}|R[0-9A-F]{6,8}-\d{3})"
+ROADMAP_ENTRY = re.compile(rf"^### ({ROADMAP_ID_PATTERN}) - .+")
 UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$")
-ROADMAP_ID = re.compile(r"^R\d{3}$")
+ROADMAP_ID = re.compile(rf"^{ROADMAP_ID_PATTERN}$")
+ROADMAP_ID_DESCRIPTION = "legacy R### or doc-keyed R<DOCKEY>-<NNN>"
 ROADMAP_RATIONALE = "Rationale:"
 ROADMAP_TASK = "Task:"
+ROADMAP_COMPLETE_NOTE = "(no more tasks)"
 
 
 @dataclass(frozen=True)
@@ -706,8 +709,14 @@ def validate_new_task_doc_contract(
         assert record.get("session_id"), f"Worklog metadata should include session_id: {record}"
         assert record.get("worklog_id"), f"Worklog metadata should include worklog_id: {record}"
 
+    archived_metadata = metadata_by_section["Archived"]
+    assert archived_metadata == [], (
+        "Creation should not add Archived entries unless source material has completed/deprecated Roadmap records"
+    )
+    assert_archived_entries_have_required_shape(lines)
+
     roadmap_metadata = metadata_by_section["Roadmap"]
-    assert roadmap_metadata, "Creation should add at least one Roadmap record"
+    assert roadmap_metadata, "Creation should add at least one Roadmap item"
     for record in roadmap_metadata:
         assert record.get("agent") == expected_agent, f"Unexpected Roadmap agent: {record}"
         assert record.get("session_id"), f"Roadmap metadata should include session_id: {record}"
@@ -751,7 +760,7 @@ def _collect_metadata(lines: list[str]) -> dict[str, list[dict[str, object]]]:
         if line.startswith("## "):
             current_section = line[3:].strip()
             continue
-        if current_section not in {"Worklog", "Roadmap", "Archived"}:
+        if current_section not in {"Worklog", "Archived", "Roadmap"}:
             continue
         if _is_entry_heading(line, current_section):
             metadata[current_section].append(_read_jsonl_metadata(lines, index, current_section))
@@ -764,13 +773,24 @@ def assert_roadmap_entries_have_required_shape(
     allow_empty: bool = False,
 ) -> None:
     entries = _entries(lines, "Roadmap")
+    note = _roadmap_note(lines)
     if allow_empty and not entries:
+        assert note == ROADMAP_COMPLETE_NOTE, (
+            "Roadmap should use the exact '(no more tasks)' note when no active items remain"
+        )
         return
-    assert entries, "Roadmap should contain at least one entry"
+    assert entries, "Roadmap should contain at least one item"
+    assert note, "Roadmap should start with a note before active items"
+    assert note != ROADMAP_COMPLETE_NOTE, (
+        "Roadmap note should be '(no more tasks)' only when no active Roadmap items remain"
+    )
     seen_ids: set[str] = set()
     for heading, metadata, body in entries:
         match = ROADMAP_ENTRY.match(heading)
-        assert match, f"Roadmap entry heading should start with an R### ID: {heading}"
+        assert match, (
+            f"Roadmap entry heading should start with a Roadmap ID "
+            f"({ROADMAP_ID_DESCRIPTION}): {heading}"
+        )
         roadmap_id = match.group(1)
         assert roadmap_id not in seen_ids, f"Roadmap id should be unique: {roadmap_id}"
         seen_ids.add(roadmap_id)
@@ -786,7 +806,10 @@ def assert_roadmap_entries_have_required_shape(
             values = metadata.get(field)
             assert isinstance(values, list) and all(
                 isinstance(value, str) and ROADMAP_ID.match(value) for value in values
-            ), f"Roadmap metadata {field} should be an array of R### ids: {metadata}"
+            ), (
+                f"Roadmap metadata {field} should be an array of Roadmap IDs "
+                f"({ROADMAP_ID_DESCRIPTION}): {metadata}"
+            )
         body_lines = body.splitlines()
         rationale_lines = [
             index for index, line in enumerate(body_lines) if line.startswith(ROADMAP_RATIONALE)
@@ -814,6 +837,50 @@ def assert_roadmap_entries_have_required_shape(
         ).strip()
         assert rationale, "Roadmap entry Rationale should be non-empty"
         assert task, "Roadmap entry Task should be non-empty"
+
+
+def assert_archived_entries_have_required_shape(lines: list[str]) -> None:
+    entries = _entries(lines, "Archived")
+    for heading, metadata, body in entries:
+        assert DATED_ENTRY.match(heading), f"Archived entry heading should be dated: {heading}"
+        assert metadata.get("type") == "roadmap", (
+            f"Archived entries should only store roadmap records: {metadata}"
+        )
+        archived_id = metadata.get("id")
+        assert isinstance(archived_id, str) and ROADMAP_ID.match(archived_id), (
+            f"Archived roadmap id should be a Roadmap ID ({ROADMAP_ID_DESCRIPTION}): {metadata}"
+        )
+        assert "created_at" not in metadata, (
+            f"Archived roadmap metadata should not preserve active created_at: {metadata}"
+        )
+        for field in ("deps", "parallels"):
+            values = metadata.get(field)
+            assert isinstance(values, list) and all(
+                isinstance(value, str) and ROADMAP_ID.match(value) for value in values
+            ), (
+                f"Archived roadmap metadata {field} should be an array of Roadmap IDs "
+                f"({ROADMAP_ID_DESCRIPTION}): {metadata}"
+            )
+        assert metadata.get("agent"), f"Archived metadata should include agent: {metadata}"
+        assert metadata.get("session_id"), f"Archived metadata should include session_id: {metadata}"
+        assert body, "Archived roadmap entry body should explain why the item left Roadmap"
+
+
+def _roadmap_note(lines: list[str]) -> str:
+    current_section: str | None = None
+    note_lines: list[str] = []
+    for line in lines:
+        if line.startswith("## "):
+            if current_section == "Roadmap":
+                break
+            current_section = line[3:].strip()
+            continue
+        if current_section != "Roadmap":
+            continue
+        if _is_entry_heading(line, "Roadmap"):
+            break
+        note_lines.append(line)
+    return "\n".join(note_lines).strip()
 
 
 def _entries(lines: list[str], section: str) -> list[tuple[str, dict[str, object], str]]:

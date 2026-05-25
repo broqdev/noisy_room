@@ -13,5 +13,5 @@ tests/.runs/
 # local dev only
 .codex/
 .gemini/
-.noisy_room/logs/
+.noisy_room/
 CONTEXT.md

@@ -59,12 +59,11 @@ NOISY_KEEP_TEST_ENVS=1 uv run pytest
 ## Current Coverage
 
 - Discovery smoke test: verifies Codex sees `noisy:tmd` through the fake workspace symlink.
-- Taskmd shape test: verifies active Roadmap items use stable `R###` IDs plus required `created_at`, `deps`, `parallels`, `Rationale`, and `Task` fields.
-- Taskmd dispatch-round shape test: verifies `-r` / `--round` repeats top-level `noisy:tmd` dispatch locally.
+- Taskmd shape test: verifies active Roadmap items use Roadmap IDs (`R<DOCKEY>-<NNN>` for new items, legacy `R###` accepted) plus required `created_at`, `deps`, `parallels`, `Rationale`, and `Task` fields.
 - Gemini wiring test: verifies the fake workspace sees `tmd` as the Agent Skill and `/noisy:tmd` as the custom command wrapper.
 - Gemini discovery smoke test: verifies `gemini skills list --all` sees `tmd` without making a model call.
 - New task doc scenario: invokes `$noisy:tmd -n` with `source.md`, validates the required markdown contract, then asks a Codex verifier for a structured semantic pass/fail result.
-- Codex Continue subagent scenario: invokes `$noisy:tmd -c` through Codex CLI `--json` on a task doc with two compatible parallel Roadmap items, asserts Codex emitted `spawn_agent` and `wait` collab tool events for at least two subagents, and checks both task work and the task doc Worklog.
+- Codex Continue execution-wave scenario: invokes `$noisy:tmd -c` through Codex CLI `--json` on a task doc with two compatible parallel Roadmap items, checks both task work and the task doc Worklog, and verifies Worklog records the actual execution mode without requiring streamed subagent events.
 - Gemini Revisit subagent scenario: opt-in live Gemini CLI test that invokes `/noisy:tmd -rv` with `stream-json`, asserts Gemini emitted an `invoke_agent` tool event for the `generalist` subagent, and checks the task doc Worklog records the delegation.
 - Gemini Continue subagent scenario: opt-in live Gemini CLI test that invokes `/noisy:tmd -c` on a task doc with two compatible parallel Roadmap items, asserts Gemini emitted two `invoke_agent` tool events for the `generalist` subagent, and checks both task work and the task doc Worklog.
 
@@ -76,4 +75,4 @@ Set these to run optional live model scenarios:
 NOISY_RUN_GEMINI_E2E=1 uv run pytest tests/live_gemini
 ```
 
-The Codex Continue scenario invokes `$noisy:tmd` through Codex CLI and proves delegation through streamed `--json` collab tool events. The Gemini scenarios invoke `/noisy:tmd` through Gemini CLI. The New scenario validates the generated task doc with the same deterministic checks and then reuses the Codex semantic verifier. The Gemini Revisit and Continue scenarios check the required subagent delegation paths with Gemini's streamed tool events.
+The Codex Continue scenario invokes `$noisy:tmd` through Codex CLI and proves a compatible execution wave through observable task work plus Worklog state, without requiring first-class subagent stream events. The Gemini scenarios invoke `/noisy:tmd` through Gemini CLI. The New scenario validates the generated task doc with the same deterministic checks and then reuses the Codex semantic verifier. The Gemini Revisit and Continue scenarios check explicit subagent delegation paths with Gemini's streamed tool events.

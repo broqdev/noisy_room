@@ -21,11 +21,11 @@ REVISIT_SUBAGENT_TASK_DOC = """# Gemini Revisit Subagent Coverage
 
 ## Goal
 
-Keep a task doc current while verifying Gemini CLI follows the Revisit subagent requirement.
+Keep a task doc current while verifying Gemini CLI follows an explicit Revisit subagent request.
 
 ## Knowledge
 
-The Revisit action must refresh the task doc only after the current agent establishes the baseline and delegates the remaining Revisit work to one subagent run.
+This scenario explicitly requests one Revisit subagent run after the current agent establishes the baseline.
 
 ## Worklog
 
@@ -41,6 +41,8 @@ Seeded this task doc for Gemini CLI Revisit coverage.
 
 ## Roadmap
 
+Refresh the Roadmap Items below only through the explicitly requested Revisit subagent.
+
 ### R001 - Refresh stale planning state
 
 ```jsonl
@@ -49,7 +51,7 @@ Seeded this task doc for Gemini CLI Revisit coverage.
 
 Rationale: The seeded state exists to exercise the Revisit path, not to execute task work.
 
-Task: Refresh this task doc only after the required Revisit subagent reviews the whole document.
+Task: Refresh this task doc only after the explicitly requested Revisit subagent reviews the whole document.
 """
 
 
@@ -87,7 +89,7 @@ def test_gemini_noisy_taskmd_revisit_uses_required_subagent(test_run_factory) ->
     assert_gemini_stream_invoked_subagent(events, agent_name="generalist")
     transcript = f"{gemini_stream_assistant_text(events)}\n{result.stderr}".lower()
     assert "subagent_delegation: used" in transcript, (
-        "Gemini final output should confirm the required Revisit subagent ran"
+        "Gemini final output should confirm the explicit Revisit subagent ran"
     )
     assert "subagent delegation used" in task_doc.read_text(encoding="utf-8").lower(), (
         "Revisit Worklog should record that subagent delegation was used"

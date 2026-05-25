@@ -4,7 +4,6 @@ import pytest
 
 from tests.harness import (
     CODEX_JSON_PROFILE,
-    assert_codex_stream_spawned_subagents,
     assert_roadmap_entries_have_required_shape,
     codex_stream_assistant_text,
     codex_stream_events,
@@ -15,15 +14,15 @@ from tests.harness import (
 pytestmark = pytest.mark.live_codex
 
 
-CONTINUE_SUBAGENTS_TASK_DOC = """# Codex Continue Subagent Coverage
+CONTINUE_EXECUTION_WAVE_TASK_DOC = """# Codex Continue Execution Wave Coverage
 
 ## Goal
 
-Verify Action Continue executes compatible parallel Roadmap items through Codex CLI subagents and records the completed task work.
+Verify Action Continue executes compatible parallel Roadmap items as one execution wave and records the actual execution mode.
 
 ## Knowledge
 
-This fixture intentionally contains two independent Roadmap items with disjoint write scopes. R001 writes only `alpha.txt`; R002 writes only `beta.txt`. Continue should dispatch one subagent for each compatible item when subagents are available.
+This fixture intentionally contains two independent Roadmap items with disjoint write scopes. R001 writes only `alpha.txt`; R002 writes only `beta.txt`. Continue should select both items in one compatible execution wave. First-class subagents may be used only when the runtime exposes reliable delegation; otherwise local execution is acceptable when Worklog records the actual mode.
 
 ## Worklog
 
@@ -33,11 +32,13 @@ This fixture intentionally contains two independent Roadmap items with disjoint 
 { "agent": "codex-cli", "session_id": "seed", "worklog_id": "seed-worklog", "trigger": "revisit" }
 ```
 
-Seeded this task doc for Codex CLI Continue subagent coverage.
+Seeded this task doc for Codex CLI Continue execution-wave coverage.
 
 ## Archived
 
 ## Roadmap
+
+Work the Roadmap Items below in the same execution wave when their metadata and write scopes remain compatible.
 
 ### R001 - Write alpha marker
 
@@ -45,7 +46,7 @@ Seeded this task doc for Codex CLI Continue subagent coverage.
 { "id": "R001", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "parallels": ["R002"], "agent": "codex-cli", "session_id": "seed" }
 ```
 
-Rationale: This item has a separate write scope from R002, so it can run in the same subagent wave.
+Rationale: This item has a separate write scope from R002, so it can run in the same execution wave.
 
 Task: Create `alpha.txt` containing exactly `alpha codex subagent completed`.
 
@@ -55,50 +56,51 @@ Task: Create `alpha.txt` containing exactly `alpha codex subagent completed`.
 { "id": "R002", "created_at": "2026-05-20 00:00:00 UTC", "deps": [], "parallels": ["R001"], "agent": "codex-cli", "session_id": "seed" }
 ```
 
-Rationale: This item has a separate write scope from R001, so it can run in the same subagent wave.
+Rationale: This item has a separate write scope from R001, so it can run in the same execution wave.
 
 Task: Create `beta.txt` containing exactly `beta codex subagent completed`.
 """
 
 
-def test_codex_noisy_taskmd_continue_parallel_items_use_subagents(test_run_factory) -> None:
-    run = test_run_factory("codex-continue-subagents")
+def test_codex_noisy_taskmd_continue_parallel_items_complete_execution_wave(test_run_factory) -> None:
+    run = test_run_factory("codex-continue-execution-wave")
     task_doc = run.write_source(
-        ".noisy_room/tasks/codex-continue-subagents.md",
-        CONTINUE_SUBAGENTS_TASK_DOC,
+        ".noisy_room/tasks/codex-continue-execution-wave.md",
+        CONTINUE_EXECUTION_WAVE_TASK_DOC,
     )
     before = run.workspace_file_hashes()
     before_worklog_count = len(metadata_records(task_doc, "Worklog"))
     prompt = (
-        "$noisy:tmd -c .noisy_room/tasks/codex-continue-subagents.md "
+        "$noisy:tmd -c .noisy_room/tasks/codex-continue-execution-wave.md "
         "continue from this task doc. The two active Roadmap items are compatible, list each "
         "other in parallels, and have disjoint write scopes. Follow Action: Continue exactly: "
-        "launch one Codex subagent for R001 and one Codex subagent for R002 in the same "
-        "parallel wave. If Codex CLI cannot start those subagents, fail clearly and do not "
-        "create the marker files. If successful, append a Worklog entry whose prose includes "
-        "the exact phrase 'codex continue subagent delegation used'. In your final answer "
-        "include exactly 'CODEX_CONTINUE_SUBAGENT_DELEGATION: used'."
+        "select R001 and R002 as one compatible execution wave. Use first-class Codex "
+        "subagents only if the runtime exposes reliable subagent delegation; otherwise "
+        "execute the selected wave locally without pretending delegation occurred. If "
+        "successful, append a Worklog entry whose prose includes the exact phrase "
+        "'codex continue execution wave used' and an 'Execution mode:' sentence. In your "
+        "final answer include exactly 'CODEX_CONTINUE_EXECUTION_WAVE: completed'."
     )
 
     result = run.codex_exec(
         prompt,
-        label="codex-continue-subagents",
+        label="codex-continue-execution-wave",
         profile=CODEX_JSON_PROFILE,
     )
 
     result.assert_success()
     events = codex_stream_events(result)
-    assert_codex_stream_spawned_subagents(events, min_count=2)
     transcript = f"{codex_stream_assistant_text(events)}\n{result.stderr}".lower()
-    assert "codex_continue_subagent_delegation: used" in transcript, (
-        "Codex final output should confirm the Continue subagents ran"
+    assert "codex_continue_execution_wave: completed" in transcript, (
+        "Codex final output should confirm the Continue execution wave completed"
     )
     task_doc_text = task_doc.read_text(encoding="utf-8")
-    assert "codex continue subagent delegation used" in task_doc_text.lower(), (
-        "Continue Worklog should record that Codex subagent delegation was used"
+    assert "codex continue execution wave used" in task_doc_text.lower(), (
+        "Continue Worklog should record that the Codex execution wave was used"
     )
-    assert "subagent delegation unavailable" not in transcript
-    assert "cannot start" not in transcript
+    assert "execution mode:" in task_doc_text.lower(), (
+        "Continue Worklog should record the actual execution mode"
+    )
 
     assert (run.workspace / "alpha.txt").read_text(encoding="utf-8").strip() == (
         "alpha codex subagent completed"

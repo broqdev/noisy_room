@@ -41,6 +41,8 @@ Seeded this task doc for Gemini CLI Continue subagent coverage.
 
 ## Roadmap
 
+Work the Roadmap Items below in the same execution wave when their metadata and write scopes remain compatible.
+
 ### R001 - Write alpha marker
 
 ```jsonl

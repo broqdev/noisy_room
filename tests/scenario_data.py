@@ -35,6 +35,8 @@ Implemented the CSV command instead of only creating a task doc.
 
 ## Roadmap
 
+Work the Roadmap Items below only when they advance the task Goal.
+
 ### R001 - Edit source brief
 
 ```jsonl

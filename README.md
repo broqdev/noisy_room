@@ -22,15 +22,6 @@ Use it with prompts such as:
 $noisy:tmd -n create a task doc use 1.md as reference
 ```
 
-To repeat the same Taskmd dispatch several times in the current agent:
-
-```text
-$noisy:tmd -c -r 3 .noisy_room/tasks/example.md advance the Roadmap
-```
-
-This is local dispatch repetition: `-r` / `--round` repeats `noisy:tmd`
-inside the current agent instead of alternating external CLI agents.
-
 ## Skill Discovery Finding
 
 Codex local skill discovery uses the namespace from the entry under
