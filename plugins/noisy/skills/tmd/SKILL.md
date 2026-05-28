@@ -100,6 +100,7 @@ Rules:
 - Active Roadmap item bodies use non-empty `Rationale:` then `Task:`. Do not put those fields in metadata.
 - New Roadmap IDs use `R<DOCKEY>-<NNN>` such as `R9A3F0C-001`. Derive `DOCKEY` from `sha256("<initial or earliest Worklog created_at UTC>\n<task-doc slug-or-title>")[:6].upper()`. For docs without this ID shape, use the key only for new IDs.
 - For new IDs, choose the next `NNN` after the largest matching ID already present in active Roadmap or Archived metadata.
+- Roadmap ID means the entire stored ID string from the heading and metadata, including the `R<DOCKEY>-` prefix when present. Copy it exactly in status updates, final responses, Worklog, Archived, `deps`, `parallels`, and subagent prompts; do not abbreviate `R9A3F0C-004` to `R004`, `004`, or "the R004 direction". Legacy `R001` is acceptable only when the item itself is exactly `R001`.
 
 ## Existing Task Doc Baseline
 
@@ -132,7 +133,7 @@ Create a task doc only; do not execute task work.
    - `Worklog`: initial creation record with `trigger: "revisit"`, mentioning referenced source docs.
    - `Archived`: empty unless source material explicitly contains completed/deprecated Roadmap records.
    - `Roadmap`: short Roadmap note, then at least the first Roadmap item with a new Roadmap ID, `created_at`, `deps: []`, `parallels: []`, `Rationale:`, and `Task:`. Add multiple Roadmap items and reciprocal `parallels` when independent tracks are clear. Do not include editing source files unless explicitly requested.
-6. Report the created task doc path.
+6. Report the created task doc path and full Roadmap IDs created.
 
 ## Action: Continue
 
@@ -140,9 +141,9 @@ Work from an existing task doc, then update it.
 
 1. Establish `Existing Task Doc Baseline`.
 2. Choose the execution set by scanning every active Roadmap item for a useful parallel execution wave. Start with the highest-priority item that advances `Goal` unless the user selected another item. Include relevant, compatible `parallels` items and other independent items not blocked by `deps`. Treat unchosen items as context to preserve or update, not stale content. If Roadmap has no active items and note is `(no more tasks)`, report the Goal already achieved. If Roadmap is otherwise empty, infer the next step or ask if unclear.
-3. Do the task work using the task doc as durable state. Invoking `Action: Continue` selects a compatible execution wave from active Roadmap Items. Prefer first-class subagent delegation only when the current runtime exposes a reliable subagent primitive and the selected items have safe, disjoint write scopes. If first-class delegation is unavailable, unreliable, unsafe, or declined, execute the selected wave locally while keeping item scopes explicit; do not pretend delegation occurred. Do not collapse independent selected Roadmap Items into an untracked blob of work: name each selected item, complete what is safe, preserve blocked or unfinished items, and record the actual execution mode in `Worklog`.
-4. Apply `Existing Task Doc Update Order` with `trigger: "roadmap"`. Worklog must state whether selected Roadmap Items were completed by first-class subagents, local execution, or a fallback path, and name each selected Roadmap Item that completed or became deprecated. Archived must receive each completed/deprecated selected Roadmap Item. Active Roadmap must keep every still-relevant unselected item, remove every completed selected Roadmap Item, revise selected items that remain relevant but incomplete, remove other deprecated items, add next items for split tracks, or set `(no more tasks)` when complete.
-5. Keep the task doc as durable state, not a separate checklist.
+3. Do the task work using the task doc as durable state. Invoking `Action: Continue` selects a compatible execution wave from active Roadmap Items. Prefer first-class subagent delegation only when the current runtime exposes a reliable subagent primitive and the selected items have safe, disjoint write scopes. If first-class delegation is unavailable, unreliable, unsafe, or declined, execute the selected wave locally while keeping item scopes explicit; do not pretend delegation occurred. Do not collapse independent selected Roadmap Items into an untracked blob of work: name each selected item by full Roadmap ID, complete what is safe, preserve blocked or unfinished items, and record the actual execution mode in `Worklog`.
+4. Apply `Existing Task Doc Update Order` with `trigger: "roadmap"`. Worklog must state whether selected Roadmap Items were completed by first-class subagents, local execution, or a fallback path, and name each selected Roadmap Item that completed or became deprecated by full Roadmap ID. Archived must receive each completed/deprecated selected Roadmap Item. Active Roadmap must keep every still-relevant unselected item, remove every completed selected Roadmap Item, revise selected items that remain relevant but incomplete, remove other deprecated items, add next items for split tracks, or set `(no more tasks)` when complete.
+5. Keep the task doc as durable state, not a separate checklist. Report the task doc path and selected, completed, blocked, or remaining Roadmap Items by full Roadmap ID.
 
 ## Action: Revisit
 
@@ -157,4 +158,4 @@ Refresh an existing task doc only; do not execute task work.
    - Stale state: outdated `Knowledge`, completed/deprecated Roadmap items, missing constraints, or unresolved uncertainty.
 5. Favor web research when current external facts could affect `Goal`, `Knowledge`, or `Roadmap`, and whenever the user asks. Use current-date searches, prefer dated official docs/repos/releases/changelogs/issues/substantive articles, and verify dates before changing assumptions or Roadmap items.
 6. Ask targeted questions only when prompt, files, repo, or research cannot resolve conflicts.
-7. If a subagent ran, review its result. Always verify the task doc still follows the contract, then report the task doc path and doc-only changes.
+7. If a subagent ran, review its result. Always verify the task doc still follows the contract, then report the task doc path and doc-only changes, including full Roadmap IDs for changed Roadmap Items.

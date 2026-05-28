@@ -43,6 +43,9 @@ def test_taskmd_requires_structured_roadmap_items() -> None:
     assert "For docs without this ID shape, use the key only for new IDs" in skill
     assert "choose the next `NNN` after the largest matching ID" in skill
     assert "active Roadmap or Archived metadata" in skill
+    assert "Roadmap ID means the entire stored ID string" in skill
+    assert "Copy it exactly in status updates, final responses, Worklog, Archived" in skill
+    assert "do not abbreviate `R9A3F0C-004` to `R004`" in skill
     assert "project-wide collision scan" not in skill
     assert "later conflicts are not disasters" not in skill
     assert "do not migrate IDs unless asked" not in skill
@@ -64,7 +67,10 @@ def test_taskmd_requires_structured_roadmap_items() -> None:
     assert "Worklog must state whether selected Roadmap Items were completed by first-class subagents, local execution, or a fallback path" in skill
     assert "launch one subagent per item in the same wave" not in skill
     assert "authorizes subagents for compatible selected Roadmap items" not in skill
-    assert "name each selected Roadmap Item that completed" in skill
+    assert "Report the created task doc path and full Roadmap IDs created" in skill
+    assert "name each selected Roadmap Item that completed or became deprecated by full Roadmap ID" in skill
+    assert "Report the task doc path and selected, completed, blocked, or remaining Roadmap Items by full Roadmap ID" in skill
+    assert "including full Roadmap IDs for changed Roadmap Items" in skill
     assert "Move completed/deprecated Roadmap Items from active `Roadmap` into `Archived`" in skill
     assert "Archived must receive each completed/deprecated selected Roadmap Item" in skill
     assert "remove every completed selected Roadmap Item" in skill
