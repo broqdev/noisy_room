@@ -1,7 +1,7 @@
 {
   "name": "noisy",
   "version": "0.0.0",
-  "description": "Project-local Noisy Room task-document workflows.",
+  "description": "Project-local Noisy Room task-document and skill-management workflows.",
   "author": {
     "name": "xsapphire"
   },
@@ -9,13 +9,15 @@
   "keywords": [
     "noisy-room",
     "task-docs",
-    "markdown"
+    "markdown",
+    "skills",
+    "github"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Noisy",
-    "shortDescription": "Project-local Noisy Room workflows.",
-    "longDescription": "Noisy provides project-local workflows for managing task markdown documents in Noisy Room.",
+    "shortDescription": "Task documents and local skill management.",
+    "longDescription": "Noisy provides durable task markdown workflows and scope-aware GitHub source registries for project-local skill installation, updates, and recovery.",
     "developerName": "xsapphire",
     "category": "Coding",
     "capabilities": [
@@ -24,7 +26,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "$noisy:tmd create a task doc use 1.md as reference"
+      "$noisy:tmd create a task doc use 1.md as reference",
+      "$noisy:local-skill"
     ],
     "screenshots": []
   }

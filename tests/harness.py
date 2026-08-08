@@ -23,6 +23,7 @@ TESTS_DIR = REPO_ROOT / "tests"
 DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "tmd"
+LOCAL_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "local-skill"
 GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "tmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
@@ -409,8 +410,12 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
     def _wire_codex_skill(self) -> None:
         skill_root = self.workspace / ".codex" / "skills"
         skill_root.mkdir(parents=True, exist_ok=True)
-        skill_link = skill_root / "noisy:tmd"
-        skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
+        for name, target in (
+            ("noisy:tmd", TASKMD_SKILL_DIR),
+            ("noisy:local-skill", LOCAL_SKILL_DIR),
+        ):
+            skill_link = skill_root / name
+            skill_link.symlink_to(target, target_is_directory=True)
 
     def _wire_gemini_skill(self) -> None:
         skill_root = self.workspace / ".gemini" / "skills"
@@ -953,11 +958,27 @@ def assert_noisy_taskmd_discovered(result: CommandResult) -> None:
     assert "noisy:tmd" in result.stdout, "Codex prompt input did not include noisy:tmd"
 
 
+def assert_noisy_local_skill_discovered(result: CommandResult) -> None:
+    result.assert_success()
+    assert "noisy:local-skill" in result.stdout, (
+        "Codex prompt input did not include noisy:local-skill"
+    )
+
+
 def assert_skill_symlink_wired(workspace: Path) -> None:
     skill_link = workspace / ".codex" / "skills" / "noisy:tmd"
     assert skill_link.is_symlink(), f"Expected noisy:tmd to be a symlink: {skill_link}"
     assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
         f"Expected noisy:tmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
+    )
+
+
+def assert_local_skill_symlink_wired(workspace: Path) -> None:
+    skill_link = workspace / ".codex" / "skills" / "noisy:local-skill"
+    assert skill_link.is_symlink(), f"Expected noisy:local-skill to be a symlink: {skill_link}"
+    assert skill_link.resolve() == LOCAL_SKILL_DIR.resolve(), (
+        "Expected noisy:local-skill to point at live skill "
+        f"{LOCAL_SKILL_DIR}, got {skill_link.resolve()}"
     )
 
 
