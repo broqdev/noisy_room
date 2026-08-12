@@ -24,7 +24,6 @@ DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "tmd"
 LOCAL_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "local-skill"
-GEMINI_TASKMD_COMMAND = REPO_ROOT / ".gemini" / "commands" / "noisy" / "tmd.toml"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
 TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Worklog", "Archived", "Roadmap"]
@@ -91,40 +90,6 @@ CODEX_JSON_PROFILE = CodexExecutionProfile(
 
 
 @dataclass(frozen=True)
-class GeminiExecutionProfile:
-    name: str
-    flags: tuple[str, ...]
-    output_format: str = "text"
-    timeout_seconds: int = 600
-
-    def command(self, prompt: str) -> list[str]:
-        return [
-            "gemini",
-            "--prompt",
-            prompt,
-            "--output-format",
-            self.output_format,
-            *self.flags,
-        ]
-
-
-GEMINI_YOLO_PROFILE = GeminiExecutionProfile(
-    name="gemini-yolo",
-    flags=(
-        "--skip-trust",
-        "--approval-mode",
-        "yolo",
-    ),
-)
-
-GEMINI_YOLO_STREAM_PROFILE = GeminiExecutionProfile(
-    name="gemini-yolo-stream",
-    flags=GEMINI_YOLO_PROFILE.flags,
-    output_format="stream-json",
-)
-
-
-@dataclass(frozen=True)
 class CommandResult:
     label: str
     command: tuple[str, ...]
@@ -180,7 +145,7 @@ class TestRun:
     def workspace_file_hashes(self) -> dict[str, str]:
         hashes: dict[str, str] = {}
         for root, dirs, files in os.walk(self.workspace, followlinks=False):
-            dirs[:] = [directory for directory in dirs if directory not in {".codex", ".gemini"}]
+            dirs[:] = [directory for directory in dirs if directory != ".codex"]
             for filename in files:
                 path = Path(root) / filename
                 if path.is_symlink():
@@ -292,37 +257,6 @@ class TestRun:
         assert result is not None
         return result
 
-    def gemini_exec(
-        self,
-        prompt: str,
-        *,
-        label: str,
-        profile: GeminiExecutionProfile = GEMINI_YOLO_PROFILE,
-    ) -> CommandResult:
-        command = profile.command(prompt)
-        before_status = self._repo_status()
-        captured_error: AssertionError | None = None
-        result: CommandResult | None = None
-        try:
-            result = self.run_command(
-                command,
-                label=label,
-                env={"GEMINI_CLI_TRUST_WORKSPACE": "true"},
-                timeout_seconds=profile.timeout_seconds,
-            )
-        except AssertionError as error:
-            captured_error = error
-
-        mutation_error = self._repo_mutation_error(label, before_status, self._repo_status())
-        if captured_error and mutation_error:
-            raise AssertionError(f"{captured_error}\n\n{mutation_error}") from captured_error
-        if mutation_error:
-            raise AssertionError(mutation_error)
-        if captured_error:
-            raise captured_error
-        assert result is not None
-        return result
-
     def verify_new_task_doc_semantics(self, *, source: Path, task_doc: Path) -> VerifierResult:
         output_path = self.artifacts / "verifier-result.json"
         prompt = f"""
@@ -353,15 +287,10 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
 
     def _write_run_metadata(self) -> None:
         codex_path = shutil.which("codex")
-        gemini_path = shutil.which("gemini")
         codex_version = _version_string(codex_path)
-        gemini_version = _version_string(gemini_path)
         metadata = {
             "codex_path": codex_path,
             "codex_version": codex_version,
-            "gemini_path": gemini_path,
-            "gemini_taskmd_command": str(GEMINI_TASKMD_COMMAND),
-            "gemini_version": gemini_version,
             "python": sys.version,
             "platform": platform.platform(),
             "repo_root": str(REPO_ROOT),
@@ -405,7 +334,6 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
 
     def _wire_skill(self) -> None:
         self._wire_codex_skill()
-        self._wire_gemini_skill()
 
     def _wire_codex_skill(self) -> None:
         skill_root = self.workspace / ".codex" / "skills"
@@ -416,17 +344,6 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
         ):
             skill_link = skill_root / name
             skill_link.symlink_to(target, target_is_directory=True)
-
-    def _wire_gemini_skill(self) -> None:
-        skill_root = self.workspace / ".gemini" / "skills"
-        skill_root.mkdir(parents=True, exist_ok=True)
-        skill_link = skill_root / "tmd"
-        skill_link.symlink_to(TASKMD_SKILL_DIR, target_is_directory=True)
-
-        command_root = self.workspace / ".gemini" / "commands" / "noisy"
-        command_root.mkdir(parents=True, exist_ok=True)
-        command_link = command_root / "tmd.toml"
-        command_link.symlink_to(GEMINI_TASKMD_COMMAND)
 
     def _write_command_artifacts(self, result: CommandResult) -> None:
         self._command_count += 1
@@ -492,8 +409,6 @@ def _version_string(binary_path: str | None) -> str:
 def create_test_run(name: str) -> TestRun:
     if not TASKMD_SKILL_DIR.exists():
         raise AssertionError(f"Taskmd skill directory does not exist: {TASKMD_SKILL_DIR}")
-    if not GEMINI_TASKMD_COMMAND.exists():
-        raise AssertionError(f"Gemini tmd command does not exist: {GEMINI_TASKMD_COMMAND}")
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     return TestRun(name)
 
@@ -608,63 +523,6 @@ def assert_codex_stream_spawned_subagents(
         f"Codex should wait for at least {min_count} completed subagent thread(s); "
         f"saw completed thread ids: {sorted(completed_thread_ids)}"
     )
-
-
-def gemini_stream_events(result: CommandResult) -> list[dict[str, object]]:
-    events: list[dict[str, object]] = []
-    for line_number, line in enumerate(result.stdout.splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise AssertionError(
-                f"Gemini stream-json stdout line {line_number} is not valid JSON: {line}"
-            ) from error
-        assert isinstance(event, dict), (
-            f"Gemini stream-json stdout line {line_number} should decode to an object: {line}"
-        )
-        events.append(event)
-    assert events, "Gemini stream-json stdout should contain events"
-    return events
-
-
-def gemini_stream_assistant_text(events: Iterable[Mapping[str, object]]) -> str:
-    chunks: list[str] = []
-    for event in events:
-        if event.get("type") == "message" and event.get("role") == "assistant":
-            content = event.get("content")
-            if isinstance(content, str):
-                chunks.append(content)
-    return "".join(chunks)
-
-
-def assert_gemini_stream_invoked_subagent(
-    events: Iterable[Mapping[str, object]],
-    *,
-    agent_name: str,
-    min_count: int = 1,
-) -> None:
-    event_list = list(events)
-    invoke_events: list[Mapping[str, object]] = []
-    for event in event_list:
-        if event.get("type") != "tool_use" or event.get("tool_name") != "invoke_agent":
-            continue
-        parameters = event.get("parameters")
-        if isinstance(parameters, Mapping):
-            invoke_events.append(parameters)
-    matching_events = [
-        parameters for parameters in invoke_events if parameters.get("agent_name") == agent_name
-    ]
-    assert len(matching_events) >= min_count, (
-        f"Gemini should invoke the {agent_name!r} subagent via invoke_agent "
-        f"at least {min_count} time(s); "
-        f"saw invoke_agent parameters: {invoke_events}"
-    )
-    assert any(
-        event.get("type") == "result" and event.get("status") == "success"
-        for event in event_list
-    ), "Gemini stream-json should finish with a success result event"
 
 
 def validate_new_task_doc_contract(
@@ -979,30 +837,6 @@ def assert_local_skill_symlink_wired(workspace: Path) -> None:
     assert skill_link.resolve() == LOCAL_SKILL_DIR.resolve(), (
         "Expected noisy:local-skill to point at live skill "
         f"{LOCAL_SKILL_DIR}, got {skill_link.resolve()}"
-    )
-
-
-def assert_gemini_taskmd_wired(workspace: Path) -> None:
-    skill_link = workspace / ".gemini" / "skills" / "tmd"
-    assert skill_link.is_symlink(), f"Expected tmd to be a symlink: {skill_link}"
-    assert skill_link.resolve() == TASKMD_SKILL_DIR.resolve(), (
-        f"Expected tmd to point at live skill {TASKMD_SKILL_DIR}, got {skill_link.resolve()}"
-    )
-
-    command_link = workspace / ".gemini" / "commands" / "noisy" / "tmd.toml"
-    assert command_link.is_symlink(), f"Expected /noisy:tmd command to be a symlink: {command_link}"
-    assert command_link.resolve() == GEMINI_TASKMD_COMMAND.resolve(), (
-        f"Expected Gemini command to point at {GEMINI_TASKMD_COMMAND}, got {command_link.resolve()}"
-    )
-
-
-def assert_gemini_taskmd_discovered(result: CommandResult) -> None:
-    result.assert_success()
-    assert re.search(r"^tmd\s+\[Enabled\]", result.stdout, re.MULTILINE), (
-        "Gemini skills list did not include tmd as an enabled skill"
-    )
-    assert not re.search(r"^noisy:tmd\s+\[", result.stdout, re.MULTILINE), (
-        "Gemini should discover the skill as tmd; noisy:tmd is the custom command name"
     )
 
 

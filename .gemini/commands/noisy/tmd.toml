@@ -1,8 +1,0 @@
-description = "Use the tmd Agent Skill through the Noisy Room task document workflow."
-prompt = """
-Use the `tmd` Agent Skill.
-
-Treat this as `/noisy:tmd {{args}}`.
-
-Follow the skill dispatch rules exactly.
-"""

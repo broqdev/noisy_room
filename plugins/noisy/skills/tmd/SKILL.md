@@ -1,6 +1,6 @@
 ---
 name: tmd
-description: Use one markdown task document under `.noisy_room/tasks/*.md` as durable task state. Use for `$noisy:tmd`, `/noisy:tmd`, create, continue, revisit, or track task-doc work. Supports `-n`/`--new`, `-c`/`--continue`, `-rv`/`--revisit`, and `--revisit-n <N>`.
+description: Use one markdown task document under `.noisy_room/tasks/*.md` as durable task state. Use for `$noisy:tmd`, create, continue, revisit, or track task-doc work. Supports `-n`/`--new`, `-c`/`--continue`, `-rv`/`--revisit`, and `--revisit-n` with a non-negative integer.
 ---
 
 # Task Markdown
