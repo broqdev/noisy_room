@@ -1,4 +1,4 @@
 interface:
   display_name: "Noisy Room: Local Skills"
   short_description: "Manage project-local skills from GitHub"
-  default_prompt: "Use $noisy:local-skill with no arguments to browse GitHub skill sources from this manager's global or project registry."
+  default_prompt: "Use $noisy:local-skill with no arguments to show the install/uninstall form for every skill in this manager's global or project registry."

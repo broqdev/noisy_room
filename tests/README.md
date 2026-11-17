@@ -58,7 +58,7 @@ NOISY_KEEP_TEST_ENVS=1 uv run pytest
 
 - Discovery smoke test: verifies Codex sees `noisy:tmd`, `noisy:local-skill`, and `noisy:watch-task` through fake workspace symlinks. This does not launch a watcher or exercise desktop chat messaging.
 - Marketplace shape test: verifies the repo marketplace exposes the `noisy` plugin from `./plugins/noisy` with the required installation policy.
-- Local-skill shape test: verifies scriptless per-skill operations, install-scope-aware registries, Preview/Apply scope binding, project-owned provenance, and recoverable mutations.
+- Local-skill shape test: verifies bundled default-source bootstrap, the no-argument full install/uninstall form, scriptless per-skill operations, install-scope-aware registries, Preview/Apply scope binding, project-owned provenance, and recoverable mutations.
 - Taskmd shape test: verifies active Roadmap items use Roadmap IDs (`R<DOCKEY>-<NNN>` for new items, legacy `R###` accepted) plus required `created_at`, `deps`, `parallels`, `Rationale`, and `Task` fields.
 - New task doc scenario: invokes `$noisy:tmd -n` with `source.md`, validates the required markdown contract, then asks a Codex verifier for a structured semantic pass/fail result.
 - Codex Continue execution-wave scenario: invokes `$noisy:tmd -c` through Codex CLI `--json` on a task doc with two compatible parallel Roadmap items, checks both task work and the task doc Worklog, and verifies Worklog records the actual execution mode without requiring streamed subagent events.

@@ -1,28 +1,28 @@
 ---
 name: local-skill
-description: Manage individual project-local Codex skills from install-scope-aware GitHub source registries without installing their enclosing plugins. Use for `$noisy:local-skill`; registering a skill repository globally or for one project; browsing available skills; or installing, uninstalling, replacing, and updating skills under a project's `.agents/skills` directory. Supports `--register`, `--install`, `--uninstall`, and `--update`.
+description: Manage individual project-local Codex skills from install-scope-aware GitHub source registries without installing their enclosing plugins. Use for `$noisy:local-skill`; showing the full install/uninstall form when called without arguments; registering a skill repository globally or for one project; or installing, uninstalling, replacing, and updating skills under a project's `.agents/skills` directory. Supports `--register`, `--install`, `--uninstall`, and `--update`.
 ---
 
 # Local Skill
 
-Manage desired project-local skills with direct shell commands and an inline Visualize picker. Select the source registry from how this manager skill was discovered: a globally discovered manager shares registrations across Codex workspaces, while a project-discovered manager keeps registrations in the current project. Create no Bash, Python, or other executable helper scripts. Never install or copy an enclosing plugin.
+Manage desired project-local skills with direct shell commands and an inline Visualize picker. Select the source registry from how this manager skill was discovered: a globally discovered manager shares registrations across Codex workspaces, while a project-discovered manager keeps registrations in the current project. Bootstrap a missing or empty selected registry from the bundled `assets/sources.list`. Create no Bash, Python, or other executable helper scripts. Never install or copy an enclosing plugin.
 
 ## Route
 
 Choose exactly one route:
 
 - A confirmed `NOISY_LOCAL_SKILL_APPLY_V1` follow-up: run **Apply**.
-- `--register <github-repository-url>`: run **Register**, then **Browse**.
+- `--register <github-repository-url>`: run **Register**, then show the **Registry form**.
 - `--install <catalog-id>...`: run **Preview** with those skills selected for installation.
 - `--uninstall <managed-id-or-destination>...`: run **Preview** with those managed skills selected for removal.
 - `--update <managed-id-or-destination>...`: run **Preview** with those managed skills selected for update.
-- No action flag: run **Browse**.
+- No arguments: show the **Registry form** for every skill from every source in the selected registry.
 
 Accept one action flag per invocation and at least one value for an action that requires values. Reject duplicate values, unsupported flags, extra positional arguments, conflicting routes, and an apply marker not followed by exactly one valid JSON payload.
 
 ## Registry scope resolution
 
-Resolve registry scope before Register, Browse, Install, Update, Replace, or any networked Apply. Base it on the active `noisy:local-skill` discovery entry, not merely the physical directory containing this file:
+Resolve registry scope before Register, Registry form, Install, Update, Replace, or any networked Apply. Base it on the active `noisy:local-skill` discovery entry, not merely the physical directory containing this file:
 
 1. Record the exact `SKILL.md` source locator shown for this active skill in the current skill catalog, then resolve its file identity and physical target without following any path during later mutation.
 2. Enumerate only Codex discovery entries that could have supplied that active file. Project entries are `local-skill` or `noisy:local-skill` entries below `.agents/skills` from the working directory through the repository root, plus this repository's supported project-development entries below `.codex/skills`. Global entries are below the resolved user `.agents/skills`, `$CODEX_HOME/skills`, `/etc/codex/skills`, Codex system-skill roots, and entries contributed by globally installed plugins according to the active Codex plugin metadata. Treat a globally installed plugin entry as global even when its cache or symlink target resolves elsewhere.
@@ -40,6 +40,7 @@ The selected registry is exclusive. A global manager uses the same `<codex-home>
 Use `<current-project>` as the target project. Keep registry state at the resolved scope and all project mutation state under its Noisy Room directory:
 
 - Source registry: `<registry-root>/sources.list`.
+- Bundled defaults: `<manager-skill-root>/assets/sources.list`, used only to bootstrap a missing or empty selected registry.
 - Registration lock: `<registry-root>/register.lock/`.
 - Target skills: `<current-project>/.agents/skills/<destination>`.
 - Project ledger: `<current-project>/.noisy_room/local-skill/state.json`.
@@ -48,7 +49,7 @@ Use `<current-project>` as the target project. Keep registry state at the resolv
 
 Require every existing managed path component to be a regular, non-symlinked directory or file of its expected type. Refuse symlinked components, special files, and destination names outside `[a-z0-9][a-z0-9-]{0,63}`.
 
-During project-scoped Register, create `<current-project>`'s missing `.noisy_room` and `.noisy_room/local-skill` components one at a time with plain `mkdir`, never `mkdir -p`. During global Register, require `<codex-home>` to exist as a real directory, then create only its missing `state`, `state/plugins`, `state/plugins/noisy`, and `state/plugins/noisy/local-skill` components one at a time; never create the Codex home itself. During confirmed Apply, independently create the current project's missing `.noisy_room`, `.noisy_room/local-skill`, `.agents`, and `.agents/skills` components one at a time. If `mkdir` reports an existing path, revalidate its type and symlink status. Track directories created by this invocation and remove them in reverse order with `rmdir` if the operation stops while they remain empty. If the selected registry root is not writable, request write authorization for that exact path when the host supports it; if authorization is denied or unavailable, report the path and stop. Never fall back to the other scope.
+During Default bootstrap or project-scoped Register, create `<current-project>`'s missing `.noisy_room` and `.noisy_room/local-skill` components one at a time with plain `mkdir`, never `mkdir -p`. During global Default bootstrap or Register, require `<codex-home>` to exist as a real directory, then create only its missing `state`, `state/plugins`, `state/plugins/noisy`, and `state/plugins/noisy/local-skill` components one at a time; never create the Codex home itself. During confirmed Apply, independently create the current project's missing `.noisy_room`, `.noisy_room/local-skill`, `.agents`, and `.agents/skills` components one at a time. If `mkdir` reports an existing path, revalidate its type and symlink status. Track directories created by this invocation and remove them in reverse order with `rmdir` if the operation stops while they remain empty. If the selected registry root is not writable, request write authorization for that exact path when the host supports it; if authorization is denied or unavailable, report the path and stop. Never fall back to the other scope.
 
 Treat the ledger as the only proof that this manager owns a destination. Use this schema:
 
@@ -81,7 +82,8 @@ Treat a missing ledger as the canonical empty state `{ "schema": 1, "generation"
 
 - Store one canonical URL per non-empty line in `sources.list` using `https://github.com/<owner>/<repository>`, without `.git`, trailing slash, query, fragment, credentials, port, or additional path components.
 - Compare canonical URLs case-insensitively, reject malformed entries and duplicates, preserve order, and require a regular non-symlinked file when it exists.
-- Permit a missing or empty registry only in Register mode. In other networked modes, explain how to use `--register` and stop without project mutation.
+- Before Register, Registry form, Install, or Update, run Default bootstrap when the selected registry is missing or empty. Never bootstrap during Apply or Uninstall.
+- Do not append defaults to, merge defaults into, or overwrite a non-empty selected registry.
 - Re-read, validate, and fingerprint the registry immediately before and after mutation. Acquire only `<registry-root>/register.lock/` atomically with `mkdir`; never break an existing lock automatically.
 - Use `apply_patch` for registry changes. Create no helper file that contains executable code.
 
@@ -89,10 +91,24 @@ After successfully creating the selected registry lock or current-project apply 
 
 For every final skill or ledger placement, require a host-provided atomic no-replace rename primitive. Probe its file and directory behavior inside the transaction before moving managed data. Arrange staged sources with the final basename and target the verified parent so an existing destination cannot become a nesting target. Never fall back to an overwriting or ordinary `mv`; if no verified no-replace primitive is available, retain staging and stop before moving any existing destination.
 
+## Default bootstrap
+
+Use the `assets/sources.list` bundled beside this `SKILL.md` as immutable bootstrap input. Resolve `<manager-skill-root>` from the active skill's physical `SKILL.md` parent after scope resolution. Require the asset to remain inside that root and to be a regular, non-symlinked file. Reject blank-only input, malformed lines, control characters, and duplicate canonical identities. Accept one optional `.git` suffix and one optional trailing slash in the asset, but normalize both away before writing the durable registry.
+
+Run this bootstrap only when the selected durable `sources.list` is missing or empty:
+
+1. Validate and normalize every bundled source in order. Clone and fully validate the complete default catalog before creating or changing registry state; require at least one accepted skill across the catalog.
+2. Create only the scope-specific missing registry directories allowed above, acquire `<registry-root>/register.lock/`, and record lock ownership as operation `default-bootstrap`.
+3. Independently re-resolve the active manager discovery entry and require the same scope, registry path, manager file identity, and bundled asset identity. Re-read the durable registry. If it became non-empty, release the owned lock and use that registry without adding defaults. If it is still missing or empty, require its fingerprint to match the state observed before locking.
+4. Write the normalized canonical URLs to the durable `sources.list` with `apply_patch`, then validate and fingerprint the complete file. On failure, restore the exact previous missing or empty state and remove only empty directories created by this invocation.
+5. Release the owned lock, clean temporary clones, report the initialized registry scope and absolute path, then restart the requested route with a fresh registry read and Discovery pass.
+
+Default bootstrap is the only mutation allowed before the no-argument form. It initializes source configuration only; it never creates the ledger, `.agents/skills`, or an installed skill. A non-empty registry always wins unchanged.
+
 ## Catalog discovery
 
 1. Create an exact task-specific directory with `mktemp -d`. Shallow-clone each required canonical URL using `git clone --depth 1 -- <url> <destination>`, and record its default branch, full `HEAD` SHA, and source key.
-2. For Browse, Install, Update, Replace, and every networked Apply, rediscover every registered source and abort the whole catalog if any source fails. This full-registry domain is the only networked catalog domain, so Preview and Apply always compute the catalog fingerprint from the same records. Uninstall requires no network.
+2. For Registry form, Install, Update, Replace, and every networked Apply, rediscover every registered source and abort the whole catalog if any source fails. This full-registry domain is the only networked catalog domain, so Preview and Apply always compute the catalog fingerprint from the same records. Uninstall requires no network.
 3. Find skills with `rg --files --hidden -g 'SKILL.md'`. Exclude `.git`, `.venv`, `node_modules`, `vendor`, `test`, `tests`, `fixture`, `fixtures`, `example`, and `examples` only when they are complete directory segments.
 4. Treat the directory containing an accepted `SKILL.md` as the skill root. Validate YAML frontmatter with exactly one string `name` matching the root folder and the safe destination pattern. Reject nested accepted skill roots, submodules, symlinks, special files, control characters in paths, and a skill root that is itself a `.codex-plugin` or `.claude-plugin` root.
 5. Inspect `SKILL.md`, `agents/openai.yaml`, and bundled text/resources for declared filesystem and plugin dependencies. Resolve relative paths against the skill root. Reject the skill when a required path escapes that root, a bundled dependency is unresolved, or execution requires an enclosing plugin's commands, hooks, agents, MCP server, or other capability that is not independently available. Treat an unverifiable required plugin-relative dependency as non-installable and report why.
@@ -116,15 +132,28 @@ Use direct quoted `find`, `stat`, sorting, and SHA-256 commands appropriate to t
 ## Register
 
 1. Resolve the manager's registry scope and exact registry path, report both, then accept exactly one HTTPS GitHub repository URL. Normalize one optional `.git` suffix and one optional trailing slash, then enforce the canonical registry format.
-2. If the canonical URL is already registered, report an idempotent no-op and continue to Browse.
+2. If the canonical URL is already registered, report an idempotent no-op and continue to Registry form.
 3. Clone and fully validate the candidate. Require at least one accepted skill.
 4. Under the registration lock, independently re-resolve the active manager discovery entry and require the same scope and registry path, then rediscover the complete prospective registry including the candidate. Release the owned lock and stop if scope changed. Do not mutate the registry if the resulting catalog is invalid.
 5. Recheck the registry fingerprint, add the URL once with `apply_patch`, and verify the complete file afterward. If verification fails, restore its exact previous contents and report the failure.
-6. Release only the lock created by this invocation, clean temporary clones, report the registered source, candidate `HEAD`, registry scope, and absolute registry path, then run a fresh Browse pass against that same scope.
+6. Release only the lock created by this invocation, clean temporary clones, report the registered source, candidate `HEAD`, registry scope, and absolute registry path, then run a fresh Registry form pass against that same scope.
 
-## Browse and Preview
+## Registry form and Preview
 
-For Browse, Install, and Update, resolve the active manager's registry scope, display it, and run Discovery against only that registry. For Uninstall, build the Preview from the current-project ledger and local destinations without cloning, resolving, or requiring a registry. Reconcile the resulting records with the current destination paths:
+With no arguments, resolve the active manager's registry scope, display it, run Discovery against the complete selected registry, and reconcile the result with the current-project ledger and destinations. Immediately render one combined install/uninstall form containing every accepted skill from every registered source. Do not return only a catalog summary, ask the user which source to browse, or require a second prompt before rendering the form.
+
+Treat each form row as the desired installed state:
+
+- Start every available skill unchecked; checking it plans an Install.
+- Start every consistently managed skill checked; clearing it plans an Uninstall.
+- Keep current skills checked and unchanged unless the user clears them.
+- Show update and replacement choices on the same row without selecting them implicitly.
+- Include conflicts and inconsistent records as disabled rows so the form still accounts for every registry skill.
+- Show managed orphaned skills in a separate checked section so the user can keep or recoverably uninstall them, even though they are no longer in the registry catalog.
+
+The no-argument form starts with no planned changes to installed skills. After any required Default bootstrap, perform no further mutation until the user selects changes and confirms Apply.
+
+For Install and Update, resolve the active manager's registry scope, display it, and run Discovery against only that registry. For Uninstall, build the Preview from the current-project ledger and local destinations without cloning, resolving, or requiring a registry. Reconcile the resulting records with the current destination paths:
 
 - **Available**: catalog record has no destination and no ledger record.
 - **Current**: ledger record and destination exist, its current fingerprint equals `installed_fingerprint`, and recorded tree OID equals the catalog tree OID.
@@ -137,7 +166,7 @@ For Browse, Install, and Update, resolve the active manager's registry scope, di
 
 For `--install`, `--uninstall`, or `--update`, resolve qualified IDs exactly. Accept a short declared name or destination only when it resolves uniquely in the relevant catalog or ledger. Apply the requested choices to the initial Preview selection; never mutate immediately.
 
-Use the available Visualize skill and follow its current `SKILL.md`. Write the fragment with `apply_patch` in the thread visualization directory, outside the project. Render:
+Use the available Visualize skill and follow its current `SKILL.md`. Write the fragment with `apply_patch` in the thread visualization directory, outside the project. For the no-argument route, title it **Install or uninstall local skills**. Render:
 
 - Search and one section per source.
 - Desired-installed checkboxes and tri-state source/all controls.
@@ -182,7 +211,7 @@ Use only these exact operation-object schemas, with no extra keys:
 
 Sort each operation array bytewise by destination and then by its displayed ID fields. Require each affected destination to appear exactly once across all four arrays. Derive these objects from the baseline ledger, full catalog, `desired_ids`, and `update_ids`; never accept a payload operation that cannot be recomputed from those inputs.
 
-For every plan containing Install, Update, or Replace, bind `registry_scope` to `"global"` or `"project"` and `registry_path` to the canonical absolute path selected from the active manager discovery entry. When the final plan contains only Uninstall operations, set `registry_scope` to `"none"`, set `registry_path` to `null`, and use the defined empty registry and catalog fingerprints regardless of whether Preview began from Browse or `--uninstall`. Do not resolve or bind that plan to `sources.list`.
+For every plan containing Install, Update, or Replace, bind `registry_scope` to `"global"` or `"project"` and `registry_path` to the canonical absolute path selected from the active manager discovery entry. When the final plan contains only Uninstall operations, set `registry_scope` to `"none"`, set `registry_path` to `null`, and use the defined empty registry and catalog fingerprints regardless of whether Preview began from Registry form or `--uninstall`. Do not resolve or bind that plan to `sources.list`.
 
 End the turn after rendering. If Visualize is unavailable, show the same catalog and exact plan as a numbered list, then wait for explicit confirmation that generates the same protocol payload.
 

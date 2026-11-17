@@ -21,6 +21,38 @@ def test_local_skill_declares_scriptless_individual_skill_management() -> None:
     assert not (LOCAL_SKILL_DIR / "scripts").exists()
 
 
+def test_local_skill_no_arguments_show_full_install_uninstall_form() -> None:
+    skill = (LOCAL_SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    metadata = (LOCAL_SKILL_DIR / "agents" / "openai.yaml").read_text(encoding="utf-8")
+
+    assert "No arguments: show the **Registry form**" in skill
+    assert "every skill from every source in the selected registry" in skill
+    assert "one combined install/uninstall form" in skill
+    assert "Start every available skill unchecked; checking it plans an Install" in skill
+    assert "Start every consistently managed skill checked; clearing it plans an Uninstall" in skill
+    assert "The no-argument form starts with no planned changes" in skill
+    assert "Install or uninstall local skills" in skill
+    assert "show the install/uninstall form for every skill" in metadata
+
+
+def test_local_skill_bootstraps_bundled_default_sources() -> None:
+    skill = (LOCAL_SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    defaults = (LOCAL_SKILL_DIR / "assets" / "sources.list").read_text(encoding="utf-8")
+
+    assert defaults.splitlines() == [
+        "https://github.com/EveryInc/compound-engineering-plugin.git",
+        "https://github.com/mattpocock/skills.git",
+        "https://github.com/DietrichGebert/ponytail.git",
+    ]
+    assert "## Default bootstrap" in skill
+    assert "Bootstrap a missing or empty selected registry" in skill
+    assert "Accept one optional `.git` suffix" in skill
+    assert "normalize both away before writing the durable registry" in skill
+    assert "Do not append defaults to, merge defaults into, or overwrite a non-empty" in skill
+    assert "Default bootstrap is the only mutation allowed before the no-argument form" in skill
+    assert "it never creates the ledger, `.agents/skills`, or an installed skill" in skill
+
+
 def test_local_skill_uses_provenance_and_exact_confirmed_plans() -> None:
     skill = (LOCAL_SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
 

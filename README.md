@@ -75,6 +75,14 @@ The source registry follows how `noisy:local-skill` was discovered:
 
 Global and project registries are never merged or used as fallbacks.
 
+On first registry-backed use, a missing or empty selected registry is initialized from the bundled defaults:
+
+- [EveryInc compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin.git)
+- [Matt Pocock skills](https://github.com/mattpocock/skills.git)
+- [Dietrich Gebert Ponytail](https://github.com/DietrichGebert/ponytail.git)
+
+Defaults never alter a non-empty registry.
+
 ### Storage
 
 | Data | Path |
@@ -94,10 +102,15 @@ Register a source and open the picker:
 $noisy:local-skill --register https://github.com/owner/repository
 ```
 
-Browse registered skills or preview a direct action:
+With no arguments, open one form containing every skill discovered from every registered source. Check an available skill to install it, or clear an installed skill to uninstall it recoverably:
 
 ```text
 $noisy:local-skill
+```
+
+Preview a direct action in the same form:
+
+```text
 $noisy:local-skill --install owner/repository#path/to/skill
 $noisy:local-skill --update skill-name
 $noisy:local-skill --uninstall skill-name
@@ -105,7 +118,7 @@ $noisy:local-skill --uninstall skill-name
 
 ### Apply and recovery
 
-The picker prepares a plan without changing the project. A separate confirmed follow-up applies the exact fingerprinted plan. Replaced and removed skill directories remain recoverable under `.noisy_room/local-skill/trash/`.
+The picker prepares a plan without changing installed skills; its only automatic state change is initializing a missing or empty source registry from the bundled defaults. A separate confirmed follow-up applies the exact fingerprinted plan. Replaced and removed skill directories remain recoverable under `.noisy_room/local-skill/trash/`.
 
 ## Task Watcher: `noisy:watch-task`
 
