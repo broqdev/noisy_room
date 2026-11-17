@@ -24,6 +24,7 @@ DEFAULT_RUNS_DIR = Path(tempfile.gettempdir()) / "noisy-room-tests"
 RUNS_DIR = Path(os.environ.get("NOISY_TEST_RUNS_DIR", str(DEFAULT_RUNS_DIR))).expanduser()
 TASKMD_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "tmd"
 LOCAL_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "local-skill"
+WATCH_TASK_SKILL_DIR = REPO_ROOT / "plugins" / "noisy" / "skills" / "watch-task"
 VERIFIER_SCHEMA = TESTS_DIR / "schemas" / "verifier-result.schema.json"
 
 TASK_DOC_SECTIONS = ["Goal", "Knowledge", "Worklog", "Archived", "Roadmap"]
@@ -341,6 +342,7 @@ If any check fails, set passed=false and list concise issues. Do not edit files.
         for name, target in (
             ("noisy:tmd", TASKMD_SKILL_DIR),
             ("noisy:local-skill", LOCAL_SKILL_DIR),
+            ("noisy:watch-task", WATCH_TASK_SKILL_DIR),
         ):
             skill_link = skill_root / name
             skill_link.symlink_to(target, target_is_directory=True)
@@ -823,6 +825,13 @@ def assert_noisy_local_skill_discovered(result: CommandResult) -> None:
     )
 
 
+def assert_noisy_watch_task_discovered(result: CommandResult) -> None:
+    result.assert_success()
+    assert "noisy:watch-task" in result.stdout, (
+        "Codex prompt input did not include noisy:watch-task"
+    )
+
+
 def assert_skill_symlink_wired(workspace: Path) -> None:
     skill_link = workspace / ".codex" / "skills" / "noisy:tmd"
     assert skill_link.is_symlink(), f"Expected noisy:tmd to be a symlink: {skill_link}"
@@ -837,6 +846,15 @@ def assert_local_skill_symlink_wired(workspace: Path) -> None:
     assert skill_link.resolve() == LOCAL_SKILL_DIR.resolve(), (
         "Expected noisy:local-skill to point at live skill "
         f"{LOCAL_SKILL_DIR}, got {skill_link.resolve()}"
+    )
+
+
+def assert_watch_task_symlink_wired(workspace: Path) -> None:
+    skill_link = workspace / ".codex" / "skills" / "noisy:watch-task"
+    assert skill_link.is_symlink(), f"Expected noisy:watch-task to be a symlink: {skill_link}"
+    assert skill_link.resolve() == WATCH_TASK_SKILL_DIR.resolve(), (
+        "Expected noisy:watch-task to point at live skill "
+        f"{WATCH_TASK_SKILL_DIR}, got {skill_link.resolve()}"
     )
 
 

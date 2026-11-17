@@ -1,7 +1,7 @@
 {
   "name": "noisy",
   "version": "0.0.0",
-  "description": "Project-local Noisy Room task-document and skill-management workflows.",
+  "description": "Noisy Room task-document, skill-management, and task-monitoring workflows.",
   "author": {
     "name": "xsapphire"
   },
@@ -11,13 +11,14 @@
     "task-docs",
     "markdown",
     "skills",
-    "github"
+    "github",
+    "task-monitoring"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Noisy",
-    "shortDescription": "Task documents and local skill management.",
-    "longDescription": "Noisy provides durable task markdown workflows and scope-aware GitHub source registries for project-local skill installation, updates, and recovery.",
+    "shortDescription": "Task documents, local skills, and task monitoring.",
+    "longDescription": "Noisy provides durable task markdown workflows, scope-aware GitHub source registries for project-local skill installation, updates, and recovery, and a Luna chat that monitors a work run and reports back once.",
     "developerName": "xsapphire",
     "category": "Coding",
     "capabilities": [
@@ -27,7 +28,8 @@
     ],
     "defaultPrompt": [
       "$noisy:tmd create a task doc use 1.md as reference",
-      "$noisy:local-skill"
+      "$noisy:local-skill",
+      "$noisy:watch-task Create a Luna watcher for my current task and send one status message back here when it finishes or is interrupted."
     ],
     "screenshots": []
   }

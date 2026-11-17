@@ -4,19 +4,20 @@
 
 Before changing or testing Noisy Room skill wiring, read `README.md`.
 
-The working local skill triggers are `noisy:tmd` and `noisy:local-skill`. Codex uses the namespace from each `.codex/skills` entry and the skill name from `SKILL.md` frontmatter, so keep symlink names and frontmatter aligned:
+The working local skill triggers are `noisy:tmd`, `noisy:local-skill`, and `noisy:watch-task`. Codex uses the namespace from each `.codex/skills` entry and the skill name from `SKILL.md` frontmatter, so keep symlink names and frontmatter aligned:
 
 ```text
 .codex/skills/noisy:tmd -> ../../plugins/noisy/skills/tmd
 .codex/skills/noisy:local-skill -> ../../plugins/noisy/skills/local-skill
+.codex/skills/noisy:watch-task -> ../../plugins/noisy/skills/watch-task
 ```
 
-When wiring another repo for testing, create the corresponding namespaced symlink in the target repo's `.codex/skills` directory. Do not add plain `.codex/skills/tmd` or `.codex/skills/local-skill` aliases unless explicitly testing non-namespaced triggers.
+When wiring another repo for testing, create the corresponding namespaced symlink in the target repo's `.codex/skills` directory. Do not add plain `.codex/skills/tmd`, `.codex/skills/local-skill`, or `.codex/skills/watch-task` aliases unless explicitly testing non-namespaced triggers.
 
 After changing `.codex/skills`, verify discovery from the target repo:
 
 ```sh
-codex debug prompt-input 'test skill discovery' | rg 'noisy:(tmd|local-skill)'
+codex debug prompt-input 'test skill discovery' | rg 'noisy:(tmd|local-skill|watch-task)'
 ```
 
 Existing Codex sessions may keep the old skill list; start a fresh session after wiring changes.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Noisy Room: Watch Task"
+  short_description: "Watch a Codex run and report its outcome"
+  default_prompt: "Use $noisy:watch-task to create a Luna watcher for my current task and send one status message back here when it finishes or is interrupted."
